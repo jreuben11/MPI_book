@@ -101,10 +101,11 @@ for (int i = 0; i < num_cvars; i++) {
 /* Example: change the eager limit */
 int cvar_index;
 MPI_T_cvar_handle handle;
+int count;
 
 /* Find the eager limit variable by name */
 MPI_T_cvar_get_index("MPIR_CVAR_CH4_OFI_EAGER_MAX_MSG_SIZE", &cvar_index);
-MPI_T_cvar_handle_alloc(cvar_index, NULL, &handle, NULL);
+MPI_T_cvar_handle_alloc(cvar_index, NULL, &handle, &count);
 
 /* Read current value */
 int current_eager;

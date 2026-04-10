@@ -279,7 +279,7 @@ separate from the host — which matters for `MPI_Win_allocate_shared` and
 # Share /dev/shm with host (needed for shared memory windows on some MPI impls)
 apptainer exec --bind /dev/shm mpi_app.sif myapp
 
-# Or allow host IPC namespace (less isolated):
+# Or use --ipc to give the container its own isolated IPC namespace:
 apptainer exec --ipc mpi_app.sif myapp
 ```
 

@@ -266,8 +266,10 @@ int periods[2] = {0, 0};  /* non-periodic */
 MPI_Comm cart_comm;
 MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cart_comm);
 
+int cart_rank;
+MPI_Comm_rank(cart_comm, &cart_rank);  /* use cart_comm rank, not COMM_WORLD rank */
 int coords[2];
-MPI_Cart_coords(cart_comm, rank, 2, coords);
+MPI_Cart_coords(cart_comm, cart_rank, 2, coords);
 
 int north, south, east, west;
 MPI_Cart_shift(cart_comm, 0, 1, &north, &south);  /* dim 0 = rows */

@@ -306,6 +306,7 @@ The choice is usually dictated by which MPI implementation your cluster provides
 ```c
 #include <mpi.h>
 #include <stdio.h>
+#include <string.h>
 
 /* Print transport info via MPI_T interface */
 void print_transport_info(void)

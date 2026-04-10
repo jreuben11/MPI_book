@@ -168,9 +168,9 @@ The most general collective: different type, count, and displacement per destina
 ```c
 int MPI_Alltoallw(
     const void *sendbuf,
-    const int sendcounts[], const int sdispls[], const MPI_Datatype sendtypes[],
+    const int sendcounts[], const MPI_Aint sdispls[], const MPI_Datatype sendtypes[],
     void *recvbuf,
-    const int recvcounts[], const int rdispls[], const MPI_Datatype recvtypes[],
+    const int recvcounts[], const MPI_Aint rdispls[], const MPI_Datatype recvtypes[],
     MPI_Comm comm);
 ```
 

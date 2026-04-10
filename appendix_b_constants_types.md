@@ -187,7 +187,7 @@ Query: `MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &tag_ub, &flag)`
 |---|---|
 | `MPI_ERRORS_ABORT` | Terminate all processes (default) |
 | `MPI_ERRORS_RETURN` | Return error code to caller |
-| `MPI_ERRORS_ARE_FATAL` | Alias for `MPI_ERRORS_ABORT` |
+| `MPI_ERRORS_ARE_FATAL` | Original name (MPI 1.x–3.x); same behavior as `MPI_ERRORS_ABORT`; deprecated in MPI 4.0 |
 | `MPI_ERRHANDLER_NULL` | Null errhandler handle |
 
 ---

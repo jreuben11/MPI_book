@@ -90,8 +90,9 @@ MPI_Send(&matrix[0][j], 1, col_type, dest, tag, comm);
 MPI_Type_free(&col_type);
 ```
 
-`MPI_Type_hvector` is identical but takes `stride` in bytes (MPI_Aint) rather than
-element counts — useful when the stride involves structure padding.
+`MPI_Type_create_hvector` is identical but takes `stride` in bytes (`MPI_Aint`) rather
+than element counts — useful when the stride involves structure padding.
+(`MPI_Type_hvector` is deprecated.)
 
 ---
 
@@ -121,11 +122,12 @@ MPI_Send(vec, 1, sparse_type, dest, tag, comm);
 MPI_Type_free(&sparse_type);
 ```
 
-`MPI_Type_hindexed` takes displacements in bytes (`MPI_Aint` array).
+`MPI_Type_create_hindexed` takes displacements in bytes (`MPI_Aint` array).
+(`MPI_Type_hindexed` is deprecated.)
 
 ---
 
-## 13.5 MPI_Type_struct — Heterogeneous Structures
+## 13.5 MPI_Type_create_struct — Heterogeneous Structures
 
 The most general datatype constructor. Describes an arbitrary combination of types
 at arbitrary byte offsets — the direct mapping to a C struct.
@@ -384,9 +386,9 @@ MPI_Type_free(&particle_resized);
 |---|---|
 | `MPI_Type_contiguous` | N copies of a type, back-to-back |
 | `MPI_Type_vector` | N blocks of M elements, regular stride (in elements) |
-| `MPI_Type_hvector` | N blocks of M elements, regular stride (in bytes) |
+| `MPI_Type_create_hvector` | N blocks of M elements, regular stride (in bytes) |
 | `MPI_Type_indexed` | N blocks at irregular positions (in elements) |
-| `MPI_Type_hindexed` | N blocks at irregular positions (in bytes) |
+| `MPI_Type_create_hindexed` | N blocks at irregular positions (in bytes) |
 | `MPI_Type_create_struct` | Heterogeneous fields at arbitrary byte offsets |
 | `MPI_Type_create_subarray` | Rectangular subregion of an n-dim array |
 | `MPI_Type_create_darray` | Block-cyclic distributed array slice |

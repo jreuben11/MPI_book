@@ -40,7 +40,7 @@ MPI_Allreduce_c(sendbuf, recvbuf, count, MPI_DOUBLE, MPI_SUM, comm);
 MPI_Count type_size;
 MPI_Type_size_x(MPI_DOUBLE, &type_size);   /* returns MPI_Count, not int */
 
-MPI_Aint lb;
+MPI_Count lb;
 MPI_Count extent;
 MPI_Type_get_extent_x(my_type, &lb, &extent);
 
@@ -252,7 +252,7 @@ printf("%s\n", libver);
 |---|---|---|
 | `MPI_Count` + `_c` variants | 4.0 | > 2B element messages |
 | `MPI_Type_size_x` | 4.0 | Large derived type sizes |
-| `MPI_Get_count_x` | 4.0 | Large receive count query |
+| `MPI_Get_count_c` | 4.0 | Large receive count query |
 | `MPI_Comm_idup` | 3.0 | Async communicator duplication |
 | Standardized info keys | 4.0/5.0 | Portable performance hints |
 | ULFM standard | 5.0 | Fault-tolerant programming |

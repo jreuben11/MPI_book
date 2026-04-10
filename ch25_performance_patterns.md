@@ -280,8 +280,9 @@ MPI_Barrier(comm);           /* usually unnecessary */
 MPI_Allreduce(...);          /* MPI collectives are NOT guaranteed barriers by the standard */
 ```
 
-Collectives already provide the necessary synchronization as a side effect. Add
-`MPI_Barrier` only when you need explicit synchronization without data movement.
+Despite common implementation behavior, the MPI standard does not guarantee that
+collectives synchronize all processes. Add `MPI_Barrier` only when you need
+guaranteed synchronization without data movement.
 
 ### Pipelining Time Steps
 

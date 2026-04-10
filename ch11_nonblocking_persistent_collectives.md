@@ -78,10 +78,10 @@ acceptable for most iterative solvers.
 The rules are stricter than for blocking collectives:
 
 1. **Non-blocking collectives on the same communicator must be matched consistently**
-   across all processes: same sequence, same collective type, one at a time. The
-   "active" period is from the `MPI_I*` call to the `MPI_Wait`. Starting a second
-   non-blocking collective on the same communicator before the first completes is
-   erroneous.
+   across all processes: same sequence, same collective type. Multiple outstanding
+   non-blocking collectives on the same communicator are permitted, but they must be
+   initiated in the same order on all processes. The "active" period for each is from
+   the `MPI_I*` call to the corresponding `MPI_Wait`.
 
 2. **Mixing blocking and non-blocking collectives on the same communicator is prohibited**
    while a non-blocking collective is active (MPI-3.1 §5.12.5). The blocking collective

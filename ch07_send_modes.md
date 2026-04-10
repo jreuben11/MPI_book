@@ -81,8 +81,8 @@ MPI_Ssend(buf, count, datatype, dest, tag, comm);
 ```
 
 Synchronous send blocks until the receiver has **posted a matching receive** and the
-data transfer has begun. It does not return until the communication is acknowledged
-by the receiver side.
+message has been matched. It does not return until the receiver has started receiving
+the message.
 
 Properties:
 - `MPI_Ssend` always blocks until the receiver is ready, regardless of message size.

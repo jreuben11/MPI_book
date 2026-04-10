@@ -15,10 +15,9 @@
 | `MPI_Group_from_session_pset` | Group from named process set | 22 |
 | `MPI_Comm_create_from_group` | Comm from group + tag string | 22 |
 
-### Deprecated in MPI 4.0
+### Deprecated in MPI 2.0
 
-These functions still exist in MPI 4.0 implementations but should not be used in
-new code:
+These functions were deprecated in MPI 2.0 and should not be used in new code:
 
 | Deprecated | Replacement |
 |---|---|

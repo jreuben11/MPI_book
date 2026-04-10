@@ -89,14 +89,14 @@ address. Use it for displacements and sizes in datatype construction.
 
 ---
 
-## 12.4 Large Count Support — MPI 4.0
+## 12.4 Large Count Support — MPI 3.0/4.0
 
 Standard MPI uses `int` for element counts. An `int` can hold at most 2,147,483,647
 (~2 billion). For large-memory machines communicating multi-billion-element arrays,
 this is insufficient.
 
-MPI 4.0 introduced `MPI_Count` — a 64-bit signed integer — and `_c` suffix variants
-of all communication functions that accept `MPI_Count` instead of `int`:
+MPI 3.0 introduced `MPI_Count` — a 64-bit signed integer. MPI 4.0 added `_c` suffix
+variants of all communication functions that accept `MPI_Count` instead of `int`:
 
 ```c
 /* Standard: limited to ~2 billion elements */
@@ -207,7 +207,7 @@ MPI_Type_set_name(my_type, "my_struct_type");
 | Fixed-width types | Use `MPI_INT32_T`, `MPI_INT64_T` etc. for cross-platform portability |
 | `MPI_BYTE` | Raw bytes; no type conversion; use for serialized data |
 | `MPI_Type_size_x` | Returns `MPI_Count`; use instead of `MPI_Type_size` for large types |
-| `MPI_Count` / `_c` variants | MPI 4.0: enables >2^31 element messages |
+| `MPI_Count` / `_c` variants | MPI 3.0/4.0: enables >2^31 element messages |
 | `MPI_AINT`, `MPI_OFFSET` | Communicate pointer/file offset values |
 | Avoid `MPI_Pack` | Use derived datatypes instead for structured data |
 

@@ -283,21 +283,27 @@ OpenSHMEM 1.5 introduced **teams** (`shmem_team_t`) analogous to MPI communicato
 /* Split world into even/odd PE subsets using shmem_team_split_strided.
    Parameters: (parent, start_pe, stride, size, config, config_mask, new_team)
    Unlike MPI_Comm_split, there is no "color" — specify explicit start+stride. */
-shmem_team_t my_team = SHMEM_TEAM_INVALID;
+/* shmem_team_split_strided is collective — ALL PEs must call with identical args.
+   Call once per sub-team to create complementary splits. */
 int me = shmem_my_pe(), npes = shmem_n_pes();
-if (me % 2 == 0) {
-    /* Even PEs: start=0, stride=2, size=npes/2 */
-    shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 2, npes / 2, NULL, 0, &my_team);
-} else {
-    /* Odd PEs: start=1, stride=2, size=npes/2 */
-    shmem_team_split_strided(SHMEM_TEAM_WORLD, 1, 2, npes / 2, NULL, 0, &my_team);
-}
+shmem_team_t even_team, odd_team;
+
+/* All PEs call: even PE team (start=0, stride=2, size=npes/2) */
+shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 2, npes / 2, NULL, 0, &even_team);
+/* All PEs call: odd PE team (start=1, stride=2, size=npes/2) */
+shmem_team_split_strided(SHMEM_TEAM_WORLD, 1, 2, npes / 2, NULL, 0, &odd_team);
+
+/* Each PE uses its own team and destroys the other */
+shmem_team_t my_team = (me % 2 == 0) ? even_team : odd_team;
+shmem_team_t other_team = (me % 2 == 0) ? odd_team : even_team;
 
 if (my_team != SHMEM_TEAM_INVALID) {
     double val = 1.0;
     shmem_double_sum_reduce(my_team, &val, &val, 1);
     shmem_team_destroy(my_team);
 }
+if (other_team != SHMEM_TEAM_INVALID)
+    shmem_team_destroy(other_team);
 ```
 
 ---

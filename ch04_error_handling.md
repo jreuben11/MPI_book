@@ -68,11 +68,11 @@ Error handlers are attached to communicators, windows, and files.
 
 | Handler | Behavior |
 |---|---|
-| `MPI_ERRORS_ARE_FATAL` | Legacy name (pre-MPI 4.0): terminate all processes immediately (default) |
+| `MPI_ERRORS_ARE_FATAL` | Original name (MPI 1.x–3.x): terminate all processes immediately (default) |
 | `MPI_ERRORS_ABORT` | MPI 4.0+ preferred name; same abort-on-error behavior |
 | `MPI_ERRORS_RETURN` | Return the error code to the caller; do not abort |
 
-Note: `MPI_ERRORS_ARE_FATAL` is the name used in MPI 1.x–3.x implementations.
+Note: `MPI_ERRORS_ARE_FATAL` is the original name from MPI 1.x–3.x implementations.
 `MPI_ERRORS_ABORT` was introduced in MPI 4.0 as the new preferred name. Both refer
 to the same behavior; prefer `MPI_ERRORS_ARE_FATAL` for portability with pre-4.0 systems.
 
@@ -240,8 +240,8 @@ Never pass `MPI_STATUSES_IGNORE` if you need to diagnose which request failed.
 ## 4.7 Fault Tolerance — MPI 5.0
 
 Standard MPI (before 5.0) offered no mechanism to recover from process failures.
-`MPI_ERRORS_ABORT` was the only real option. MPI 4.0 introduced **User Level Failure
-Mitigation (ULFM)** as an experimental annex; MPI 5.0 standardized it.
+`MPI_ERRORS_ABORT` was the only real option. MPI 5.0 introduced and standardized
+**User Level Failure Mitigation (ULFM)**.
 
 The three core ULFM operations:
 

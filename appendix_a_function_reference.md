@@ -157,9 +157,9 @@ MPI_Op_free(MPI_Op *op)
 ```c
 MPI_Type_contiguous(int count, MPI_Datatype old, MPI_Datatype *new)
 MPI_Type_vector(int count, int block, int stride, MPI_Datatype old, MPI_Datatype *new)
-MPI_Type_hvector(int count, int block, MPI_Aint stride, MPI_Datatype old, MPI_Datatype *new)
+MPI_Type_hvector(int count, int block, MPI_Aint stride, MPI_Datatype old, MPI_Datatype *new)  /* deprecated; use MPI_Type_create_hvector */
 MPI_Type_indexed(int count, int blocks[], int displs[], MPI_Datatype old, MPI_Datatype *new)
-MPI_Type_hindexed(int count, int blocks[], MPI_Aint displs[], MPI_Datatype old, MPI_Datatype *new)
+MPI_Type_hindexed(int count, int blocks[], MPI_Aint displs[], MPI_Datatype old, MPI_Datatype *new)  /* deprecated; use MPI_Type_create_hindexed */
 MPI_Type_create_struct(int count, int blocks[], MPI_Aint displs[],
                         MPI_Datatype types[], MPI_Datatype *new)
 MPI_Type_create_subarray(int ndims, int sizes[], int subsizes[], int starts[],
@@ -173,7 +173,7 @@ MPI_Type_free(MPI_Datatype *dtype)
 MPI_Type_size(MPI_Datatype dtype, int *size)
 MPI_Type_size_x(MPI_Datatype dtype, MPI_Count *size)
 MPI_Type_get_extent(MPI_Datatype dtype, MPI_Aint *lb, MPI_Aint *extent)
-MPI_Type_get_extent_x(MPI_Datatype dtype, MPI_Aint *lb, MPI_Count *extent)
+MPI_Type_get_extent_x(MPI_Datatype dtype, MPI_Count *lb, MPI_Count *extent)
 MPI_Type_get_true_extent(MPI_Datatype dtype, MPI_Aint *lb, MPI_Aint *extent)
 MPI_Get_address(const void *location, MPI_Aint *address)
 MPI_Type_set_name(MPI_Datatype dtype, const char *name)

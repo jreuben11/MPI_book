@@ -86,7 +86,6 @@ while (!done) {
     SCR_Need_checkpoint(&need_checkpoint);
 
     if (need_checkpoint) {
-        char checkpoint_name[SCR_MAX_FILENAME];
         SCR_Start_checkpoint();
 
         /* Each rank writes its own checkpoint file */

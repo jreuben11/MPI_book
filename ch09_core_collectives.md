@@ -30,9 +30,9 @@ if (rank == 0) printf("--- All ranks reported ---\n");
 ```
 
 **Warning**: `MPI_Barrier` synchronizes — it does not transmit data. It is often
-misused as a performance fix for race conditions. In most cases, the correct
-collective for your operation (`MPI_Reduce`, `MPI_Allreduce`) already provides the
-necessary synchronization as a side effect.
+added unnecessarily before other collective calls. In most cases, calling the correct
+collective (`MPI_Reduce`, `MPI_Allreduce`) directly — without an explicit barrier
+first — is correct, as each collective handles its own internal coordination.
 
 `MPI_Barrier` has measurable cost on large process counts. Use it sparingly.
 
@@ -271,12 +271,11 @@ MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_SUM, comm);
 
 /* Reduce in place — only root passes MPI_IN_PLACE as sendbuf */
 double result;
-if (rank == 0) result = compute_local_value();
-else           result = compute_local_value(); /* ignored on non-root */
+result = compute_local_value();   /* all ranks contribute via sendbuf */
 
 MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &result,
            &result, 1, MPI_DOUBLE, MPI_SUM, 0, comm);
-/* On root: result holds global sum; on others: result is unmodified */
+/* On root: result holds global sum; on non-root: recvbuf content is undefined */
 ```
 
 ---

@@ -149,8 +149,8 @@ int MPI_Win_unlock(int rank, MPI_Win win);
 
 `lock_type`:
 - `MPI_LOCK_EXCLUSIVE`: only one process may hold the lock; mutual exclusion.
-- `MPI_LOCK_SHARED`: multiple processes may hold simultaneously; appropriate for
-  non-conflicting operations such as reads and `MPI_Accumulate` calls.
+- `MPI_LOCK_SHARED`: multiple processes may hold simultaneously; `MPI_Put`,
+  `MPI_Get`, and `MPI_Accumulate` are all permitted under a shared lock.
 
 ```c
 /* Rank 0 writes to rank 1's window without rank 1 doing anything */

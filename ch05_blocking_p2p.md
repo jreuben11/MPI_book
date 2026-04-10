@@ -13,7 +13,8 @@ The destination rank determines routing but is not part of the matching envelope
 it is implicit (the calling receiver process). When multiple messages with the same
 envelope are in flight, MPI guarantees they arrive in FIFO order. This is the
 **non-overtaking guarantee**: messages from the same source on the same communicator
-arrive in the order they were sent, regardless of tag.
+with the same tag arrive in the order they were sent. Tags allow selective matching —
+a receiver can match a later-sent message first by specifying its tag.
 
 ---
 

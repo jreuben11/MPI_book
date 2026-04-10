@@ -96,12 +96,13 @@ MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &tag_ub, &flag);
 printf("Max tag: %d\n", *tag_ub);
 ```
 
-MPI guarantees FIFO ordering for messages sent from the same source to the same
-destination within the same communicator — regardless of tags and regardless of whether
-sends are blocking or non-blocking. Tags do not break this ordering; they serve as a
-matching filter so the receiver can selectively receive a specific message out of the
-stream. Use explicit tags in your protocol design to distinguish message types, not to
-impose ordering.
+MPI guarantees FIFO ordering within the same (source, tag, communicator) group: if a
+sender sends two messages to the same destination with the same tag on the same
+communicator, they arrive in the order they were sent. However, tags allow receivers
+to selectively match messages — by specifying a particular tag, the receiver can
+receive a later-sent message before an earlier one that has a different tag. Use
+explicit tags in your protocol design to distinguish message types; do not rely on
+ordering across different tag values.
 
 ### Tag Discipline
 
@@ -249,7 +250,7 @@ RMA buffer rules are more complex and depend on synchronization epochs. See Chap
 Several collectives support `MPI_IN_PLACE` to avoid allocating a separate buffer:
 
 ```c
-/* Allreduce in place — root uses its sendbuf as both input and output */
+/* Allreduce in place — all ranks use their own buffer as both input and output */
 int local_sum = compute_local_sum();
 MPI_Allreduce(MPI_IN_PLACE, &local_sum, 1, MPI_INT, MPI_SUM,
               MPI_COMM_WORLD);
@@ -295,6 +296,7 @@ MPI_File_get_info(fh, &info_used);
 
 char val[256];
 int flag;
+/* MPI_Info_get is deprecated in MPI 4.0; use MPI_Info_get_string instead */
 MPI_Info_get(info_used, "striping_factor", 256, val, &flag);
 if (flag) printf("striping_factor accepted: %s\n", val);
 MPI_Info_free(&info_used);

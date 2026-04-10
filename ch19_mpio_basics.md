@@ -264,10 +264,9 @@ compute_next_step();
 MPI_Wait(&io_req, MPI_STATUS_IGNORE);
 ```
 
-Non-blocking collective variants (MPI-3.1+): `MPI_File_iread_all`, `MPI_File_iwrite_all`
-(no `_at` suffix; they use the current file view and individual file pointer, not an
-explicit offset). Note: `MPI_File_iread_at_all` and `MPI_File_iwrite_at_all` do not
-exist in the MPI standard.
+Non-blocking collective variants (MPI 3.1): `MPI_File_iread_at_all` and
+`MPI_File_iwrite_at_all` (at explicit offset, collective), plus `MPI_File_iread_all`
+and `MPI_File_iwrite_all` (using the current file view and individual file pointer).
 
 ---
 

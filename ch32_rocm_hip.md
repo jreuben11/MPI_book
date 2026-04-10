@@ -362,8 +362,8 @@ For code that must run on both NVIDIA and AMD:
   #define gpuMemcpyH2D    hipMemcpyHostToDevice
   #define gpuMemcpyD2H    hipMemcpyDeviceToHost
   #include <rccl/rccl.h>
-  #define gpuCommT        rcclComm_t
-  /* ... map all nccl* → rccl* ... */
+  #define gpuCommT        ncclComm_t   /* RCCL uses ncclXxx names — no rccl prefix */
+  /* No nccl→rccl renaming needed: RCCL exposes the same ncclXxx API */
 #else
   #include <cuda_runtime.h>
   #define gpuMalloc       cudaMalloc
@@ -465,7 +465,7 @@ bool cpu_accessible = (attr.memoryType == hipMemoryTypeUnified ||
 | Local rank assignment | Same `MPI_COMM_TYPE_SHARED` pattern as CUDA |
 | Peer access | `hipDeviceEnablePeerAccess`; xGMI links on same node |
 | RCCL | Uses `ncclXxx` API names directly; include `<rccl/rccl.h>` |
-| RCCL init | `rcclGetUniqueId` on rank 0 → `MPI_Bcast` → `rcclCommInitRank` |
+| RCCL init | `ncclGetUniqueId` on rank 0 → `MPI_Bcast` → `ncclCommInitRank` |
 | Portability | `#ifdef USE_ROCM` shim or Kokkos abstraction layer |
 | MI300X | Unified CPU+GPU memory; no H2D copies; simplifies MPI integration |
 | Frontier/LUMI | `--ntasks-per-node=8` for MI250X (8 GCDs); `--gpu-bind=closest` |
