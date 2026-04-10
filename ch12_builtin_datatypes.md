@@ -210,3 +210,7 @@ MPI_Type_set_name(my_type, "my_struct_type");
 | `MPI_Count` / `_c` variants | MPI 4.0: enables >2^31 element messages |
 | `MPI_AINT`, `MPI_OFFSET` | Communicate pointer/file offset values |
 | Avoid `MPI_Pack` | Use derived datatypes instead for structured data |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -355,3 +355,7 @@ In C++, `std::vector<MPI_Request>` works well. Pass `requests.data()` to MPI fun
 - Never touch buffers between Isend/Irecv and the Wait
 - Store all request handles; never lose them
 - Use Waitall for simple cases; Waitany/Waitsome for server-style patterns
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

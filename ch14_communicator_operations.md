@@ -330,3 +330,7 @@ MPI_Comm_get_name(comm, name, &namelen);
 | `MPI_Intercomm_merge` | Convert inter- to intra-communicator |
 | `MPI_Comm_free` | Release handle; sets to `MPI_COMM_NULL` |
 | `MPI_Dims_create` | Compute balanced grid dimensions |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

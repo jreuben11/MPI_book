@@ -300,3 +300,7 @@ When `MPI_Init` is called, MPI implicitly creates an internal session and create
 - No dependency on `MPI_COMM_WORLD`
 - Enables dynamic process management and fault tolerance
 - Safe for use in multiple independent libraries within one application
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

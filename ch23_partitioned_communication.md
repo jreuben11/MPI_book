@@ -255,3 +255,7 @@ Check with:
 non-blocking is to blocking — but the "completeness" signal is per-partition, not
 per-message. It enables genuine pipeline parallelism between producers, the network,
 and consumers.
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

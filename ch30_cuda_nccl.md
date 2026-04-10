@@ -418,3 +418,7 @@ srun --gpu-bind=per_task ./myprogram
 | Stream synchronization | Always `cudaStreamSynchronize` between NCCL and MPI operations |
 | NCCL P2P | Must use `ncclGroupStart` / `ncclGroupEnd` |
 | Error handling | Check both `ncclResult_t` and `cudaError_t`; abort on failure |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -189,3 +189,7 @@ choice itself. Write for correctness first; tune only with profiler data.
 | Receiver must pre-post? | No | No | No | **Yes** |
 | Safe from deadlock? | Depends on size | Yes | No | Depends on protocol |
 | Recommended for production? | Yes | Rarely | No (debug only) | No |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

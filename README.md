@@ -153,3 +153,7 @@ are excluded — see the full MPI 5.0 specification for these.
 Implementation notes for **Open MPI 5.x**, **MPICH 4.x**, **Intel MPI 2024+**,
 and **Cray MPICH** (HPE Cray EX) are included throughout. Where behavior
 differs between implementations, it is noted explicitly.
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

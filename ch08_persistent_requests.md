@@ -195,3 +195,7 @@ filled asynchronously.
 
 **When to use**: tight loops with a fixed communication pattern and small message
 sizes where benchmarking shows measurable reduction in per-iteration overhead.
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

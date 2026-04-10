@@ -300,3 +300,7 @@ Fix: use unique tags per thread or per operation.
 - Always check `provided` level
 - Prefer `MPI_THREAD_FUNNELED` — simpler and faster than `MPI_THREAD_MULTIPLE`
 - Use per-thread communicators or unique tags to prevent message ordering ambiguity
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -258,3 +258,7 @@ to the same window simultaneously.
 | `MPI_Win_unlock_all` | Passive | Unlock all targets |
 | `MPI_Win_flush` | Passive | Force completion (no unlock) |
 | `MPI_Win_flush_local` | Passive | Buffer safety only (no remote complete) |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

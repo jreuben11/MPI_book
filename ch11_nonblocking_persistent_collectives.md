@@ -230,3 +230,7 @@ As of 2025, Open MPI 5.x and MPICH 4.x both implement MPI 4.0 persistent collect
 - `_init` called once; `MPI_Start` + `MPI_Wait` per iteration
 - After `MPI_Wait`, request is inactive (not null) — ready to restart
 - Free with `MPI_Request_free` when done
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

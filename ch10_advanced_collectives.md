@@ -344,3 +344,7 @@ Rules for custom operations:
 | `MPI_Reduce_scatter_block` | Reduce + scatter (equal chunks) |
 | `MPI_Reduce_scatter` | Reduce + scatter (variable chunks) |
 | `MPI_Op_create` | Register a user-defined reduction function |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

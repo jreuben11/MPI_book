@@ -257,3 +257,7 @@ printf("%s\n", libver);
 | Standardized info keys | 4.0/5.0 | Portable performance hints |
 | ULFM standard | 5.0 | Fault-tolerant programming |
 | RMA unified model | 5.0 | Clearer semantics for coherent hardware |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -290,3 +290,7 @@ exist in the MPI standard.
 2. Use `MPI_File_set_view` with subarray types instead of manually computing offsets
 3. Call `MPI_File_preallocate` before large writes
 4. Set striping hints before `MPI_File_open`
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

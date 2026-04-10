@@ -263,3 +263,7 @@ is on the critical path.
 | `MPI_Fetch_and_op` | Scalar atomic operation (hardware-mappable) |
 | `MPI_Compare_and_swap` | Atomic CAS for distributed lock-free algorithms |
 | `MPI_Rput/Rget/Raccumulate` | Request-based variants; buffer-safe after `MPI_Wait` |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

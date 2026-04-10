@@ -320,3 +320,7 @@ MPI_Type_free(&col_type);
 | `MPI_Dist_graph_create_adjacent` | Irregular/sparse neighbor graph |
 | `MPI_Neighbor_alltoall` | Exchange with graph neighbors |
 | `MPI_PROC_NULL` | Null rank; absorbs sends, returns empty receives |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

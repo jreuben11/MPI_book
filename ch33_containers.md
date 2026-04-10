@@ -435,3 +435,7 @@ From: ubuntu:22.04
 | Shared memory | Add `--bind /dev/shm` or `--ipc` if MPI shared memory windows fail |
 | CPU binding | SLURM `--cpu-bind` works through containers transparently |
 | Debugging | Check `PMIX_SERVER_URI`, verify MPI version match, enable `PMIX_DEBUG=1` |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

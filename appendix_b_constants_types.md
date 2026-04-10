@@ -345,3 +345,7 @@ In practice, use `MPI_Get_address` and relative displacements instead.
 | `MPI_UNIVERSE_SIZE` | `int *` | Size of MPI universe |
 
 Query with `MPI_Comm_get_attr(MPI_COMM_WORLD, key, &val, &flag)`.
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -356,3 +356,7 @@ int main(int argc, char *argv[])
 | `MPI_Iprobe` | Non-blocking probe; returns `flag` |
 | `MPI_Mprobe` / `MPI_Mrecv` | Atomically claim a message (thread-safe probe) |
 | `MPI_Get_count` | Get actual number of elements received |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

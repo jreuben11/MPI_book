@@ -399,3 +399,7 @@ Interoperability rules (implementation-dependent):
 | `shmem_long_wait_until` | Spin-wait on symmetric variable |
 | `shmem_double_sum_reduce` | Collective reduction via team |
 | `SHMEM_TEAM_WORLD` | Default team (all PEs) |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

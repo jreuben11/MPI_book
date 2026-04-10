@@ -523,3 +523,7 @@ cat /etc/cufile.json
 | Partitioned comm | cuFile reads trigger `MPI_Pready`; natural pipeline |
 | Checkpoint | Per-rank files with cuFile; `MPI_Barrier` for collective sync |
 | Filesystem | Lustre 2.15+, GPFS 5.1.3+, local NVMe; no NFS |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

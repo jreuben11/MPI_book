@@ -321,3 +321,7 @@ if (req != MPI_REQUEST_NULL) MPI_Wait(&req, MPI_STATUS_IGNORE);
 | Process binding | High | NUMA machines, shared compute |
 | Async progress | Variable | Large non-blocking ops |
 | Avoid unnecessary Barrier | Low-Medium | Present in most codes |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

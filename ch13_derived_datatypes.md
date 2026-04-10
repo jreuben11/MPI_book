@@ -397,3 +397,7 @@ MPI_Type_free(&particle_resized);
 - Always call `MPI_Type_free` when done.
 - Always use `MPI_Get_address` for struct displacements — never compute manually.
 - Use `MPI_Type_create_resized` when using derived types with count > 1.
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -307,3 +307,7 @@ MPI_Errhandler_free(&saved);
 | `MPI_Waitall` errors | Returns `MPI_ERR_IN_STATUS`; check each `status.MPI_ERROR` |
 | ULFM (MPI 5.0) | `Revoke` / `Shrink` / `Agree` for fault-tolerant recovery |
 | Library rule | Save/restore caller's error handler; use `MPI_Comm_dup` |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

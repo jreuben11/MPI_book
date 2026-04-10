@@ -432,3 +432,7 @@ mpirun -np 16 $HOME/osu/libexec/osu-micro-benchmarks/mpi/collective/osu_allreduc
 | InfiniBand | `UCX_TLS=rc_x` (UCX) or `FI_PROVIDER=verbs` (libfabric) |
 | Rendezvous | Tune threshold with `UCX_RNDV_THRESH` or `MPIR_CVAR_CH4_OFI_ENABLE_RNDV` |
 | Diagnosis | OSU microbenchmarks; `fi_info`; `UCX_LOG_LEVEL=info`; `fi_rdm_tagged_bw` |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

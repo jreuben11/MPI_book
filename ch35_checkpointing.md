@@ -512,3 +512,7 @@ srun ./solver --ckpt-dir=$CKPT_DIR
 | Restart | `SCR_Have_restart` / `VELOC_Restart_test` → read saved state → resume iteration |
 | SLURM | Job arrays (`--array=1-N%1`) with time limits provide automatic restart mechanism |
 | I/O tips | Checkpoint to `/dev/shm` or burst buffer first; SCR/VeloC flush to PFS in background |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

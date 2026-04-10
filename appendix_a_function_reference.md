@@ -390,3 +390,7 @@ MPI_Info_get_nkeys(MPI_Info info, int *nkeys)
 MPI_Info_get_nthkey(MPI_Info info, int n, char *key)
 MPI_Info_dup(MPI_Info info, MPI_Info *newinfo)
 ```
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -378,3 +378,7 @@ srun --ntasks-per-node=1 ibstat | grep -A2 State
 | Job arrays | Parameter sweeps with independent allocations |
 | Lustre striping | Set before job runs with `lfs setstripe` |
 | `salloc` | Interactive allocation for debugging |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

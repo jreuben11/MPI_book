@@ -217,3 +217,7 @@ organized for learning rather than reference.
 | MPI 4.0 | Sessions, partitioned comm, persistent collectives, large counts |
 | MPI 5.0 | Fault tolerance standardized, RMA clarified, deprecation cleanup |
 | Implementations | Open MPI and MPICH are the open-source foundations |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

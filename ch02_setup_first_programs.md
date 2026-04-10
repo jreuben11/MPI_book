@@ -519,3 +519,7 @@ multi-library problem.
 | `MPI_Wtime()` | Wall-clock timer in seconds; use for benchmarking |
 | `MPI_STATUS_IGNORE` | Use when you do not need receive status metadata |
 | `MPI_Abort` | Emergency termination; not a substitute for clean error handling |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

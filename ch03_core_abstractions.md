@@ -352,3 +352,7 @@ known.
 | `MPI_IN_PLACE` | Eliminates extra buffer in collectives; rules vary by function |
 | `MPI_Info` | Advisory hints; never affects correctness |
 | Wildcards | `MPI_ANY_SOURCE`, `MPI_ANY_TAG`; use named constants |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

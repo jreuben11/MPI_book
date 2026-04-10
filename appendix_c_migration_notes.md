@@ -235,3 +235,7 @@ As of early 2025:
 Always verify the specific features you rely on against your vendor's release notes.
 `MPI_VERSION` and `MPI_SUBVERSION` macros give the standard the implementation claims
 to implement; `MPI_Get_library_version` gives the actual library version string.
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

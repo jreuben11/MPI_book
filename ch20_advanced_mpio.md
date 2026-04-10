@@ -278,3 +278,7 @@ with the current run configuration.
 - Lustre striping hints
 - `MPI_File_preallocate` before large writes
 - Two-phase I/O via `romio_cb_write` hints
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -135,3 +135,7 @@ language support. All GPU chapters include CMake `CMakeLists.txt` snippets.
 
 *MPI 5.0 Programming Guide — C/C++*
 *Based on the MPI 4.0 standard (2021) and MPI 5.0 standard (2025)*
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -339,3 +339,7 @@ mpiexec -n 4 valgrind --leak-check=full ./myprogram
 2. Correct results on 2 processes
 3. Correct results on P processes
 4. Profile and optimize
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

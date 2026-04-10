@@ -506,3 +506,7 @@ if rank == 0:
 | C interop | `comm.py2f()` returns Fortran handle; C side uses `MPI_Comm_f2c()` |
 | Futures | `mpi4py.futures.MPIPoolExecutor` for task-parallel workloads |
 | Performance | Large arrays hit >95% of C MPI speed; always use uppercase + contiguous arrays |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

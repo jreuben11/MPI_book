@@ -469,3 +469,7 @@ bool cpu_accessible = (attr.memoryType == hipMemoryTypeUnified ||
 | Portability | `#ifdef USE_ROCM` shim or Kokkos abstraction layer |
 | MI300X | Unified CPU+GPU memory; no H2D copies; simplifies MPI integration |
 | Frontier/LUMI | `--ntasks-per-node=8` for MI250X (8 GCDs); `--gpu-bind=closest` |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

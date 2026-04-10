@@ -225,3 +225,7 @@ Window memory created with `MPI_Win_create` must be freed separately by the user
 
 **Key parameters**: `disp_unit` sets the displacement unit; `size` in bytes.
 For `MPI_Win_create_dynamic`, use `disp_unit = 1` (byte addressing).
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

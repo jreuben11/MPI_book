@@ -486,3 +486,7 @@ protecting mutex or the `packaged_task` pattern from Section 27.5).
 - Use `MPI_THREAD_MULTIPLE` + per-thread `MPI_Comm_dup` for independent thread comms
 - Never detach threads that call MPI
 - All MPI collectives must come from exactly one thread at a time per process
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*

@@ -370,3 +370,7 @@ int main(int argc, char *argv[])
 | `MPI_Allreduce` | Each → all: reduction result on every rank |
 | `MPI_Alltoall` | Each ↔ each: personalized exchange |
 | `MPI_IN_PLACE` | Eliminate extra buffer on root or all ranks |
+
+---
+
+*© 2025 jreuben1. Licensed under [CC BY 4.0](LICENSE).*
