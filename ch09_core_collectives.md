@@ -275,7 +275,7 @@ result = compute_local_value();   /* all ranks contribute via sendbuf */
 
 MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &result,
            &result, 1, MPI_DOUBLE, MPI_SUM, 0, comm);
-/* On root: result holds global sum; on non-root: recvbuf content is undefined */
+/* On root: result holds global sum; on non-root: recvbuf is ignored and untouched */
 ```
 
 ---
@@ -291,13 +291,14 @@ MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &result,
    counts may differ for scatter/gather, but each sender's count must match root's
    expectation for that sender).
 
-4. **Collectives on `MPI_COMM_WORLD` cannot be interleaved with point-to-point
-   messages using the same communicator** in a way that could deadlock. Use separate
-   communicators for independent streams of communication.
+4. **Point-to-point and collective operations on the same communicator are independent**
+   and may be in-flight simultaneously. Use separate communicators when you need to
+   isolate independent streams of communication.
 
-5. **Collective calls on the same communicator are ordered**: they complete in the
-   same logical order across all processes. Two different collectives on the same
-   communicator cannot overlap.
+5. **Blocking collective calls on the same communicator are ordered**: they must be
+   issued in the same logical order across all processes. Non-blocking collectives
+   (`MPI_Ibarrier`, `MPI_Ibcast`, etc., introduced in MPI 3.0) may overlap but must
+   still be initiated in the same order on all processes.
 
 ---
 

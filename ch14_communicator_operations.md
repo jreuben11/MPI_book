@@ -286,7 +286,7 @@ MPI_Comm_delete_attr(comm, keyval);
 MPI_Comm_free_keyval(&keyval);
 ```
 
-The copy function (second argument to `MPI_Comm_create_keyval`) is called when
+The copy function (first argument to `MPI_Comm_create_keyval`) is called when
 `MPI_Comm_dup` duplicates the communicator. Use it to deep-copy your attached data.
 `MPI_COMM_NULL_COPY_FN` means "do not copy the attribute on dup."
 `MPI_COMM_NULL_DELETE_FN` means "do nothing when the communicator is freed."

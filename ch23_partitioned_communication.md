@@ -55,18 +55,18 @@ occupies a contiguous slice of the buffer.
 
 ```c
 /* Sender: signal that partition i is ready to send */
-int MPI_Pready(int partition, MPI_Request *request);
+int MPI_Pready(int partition, MPI_Request request);
 
 /* Sender: signal that a range of partitions is ready */
-int MPI_Pready_range(int partition_low, int partition_high, MPI_Request *request);
+int MPI_Pready_range(int partition_low, int partition_high, MPI_Request request);
 
 /* Sender: signal an arbitrary set of partitions */
-int MPI_Pready_list(int length, int partition_list[], MPI_Request *request);
+int MPI_Pready_list(int length, const int array_of_partitions[], MPI_Request request);
 ```
 
 ```c
 /* Receiver: check if partition i has arrived */
-int MPI_Parrived(MPI_Request *request, int partition, int *flag);
+int MPI_Parrived(MPI_Request request, int partition, int *flag);
 ```
 
 ---
@@ -95,7 +95,7 @@ for (int step = 0; step < NSTEPS; step++) {
         fill_partition(part_buf, ELEMS_PER_PART, p, step);
 
         /* Signal: this partition is ready */
-        MPI_Pready(p, &send_req);
+        MPI_Pready(p, send_req);
     }
 
     MPI_Wait(&send_req, MPI_STATUS_IGNORE);
@@ -123,7 +123,7 @@ for (int step = 0; step < NSTEPS; step++) {
     while (completed < NPARTITIONS) {
         for (int p = 0; p < NPARTITIONS; p++) {
             int arrived;
-            MPI_Parrived(&recv_req, p, &arrived);
+            MPI_Parrived(recv_req, p, &arrived);
             if (arrived) {
                 double *part_buf = buf + p * ELEMS_PER_PART;
                 process_partition(part_buf, ELEMS_PER_PART, p);
@@ -245,9 +245,9 @@ Check with:
 | `MPI_Psend_init` | Initialize partitioned send (inactive) |
 | `MPI_Precv_init` | Initialize partitioned receive (inactive) |
 | `MPI_Start` | Begin send/receive epoch |
-| `MPI_Pready(p, req)` | Signal partition `p` is ready to send |
-| `MPI_Pready_range(lo, hi, req)` | Signal range of partitions |
-| `MPI_Parrived(req, p, &flag)` | Check if partition `p` has arrived |
+| `MPI_Pready(p, req)` | Signal partition `p` is ready to send (req by value) |
+| `MPI_Pready_range(lo, hi, req)` | Signal range of partitions (req by value) |
+| `MPI_Parrived(req, p, &flag)` | Check if partition `p` has arrived (req by value) |
 | `MPI_Wait` | Complete epoch; request becomes inactive |
 | `MPI_Request_free` | Free after all iterations done |
 

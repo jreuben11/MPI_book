@@ -19,7 +19,7 @@ built-ins into complex layouts.
 
 | MPI Type | C Type | Typical Size |
 |---|---|---|
-| `MPI_CHAR` | `signed char` | 1 byte |
+| `MPI_CHAR` | `char` | 1 byte |
 | `MPI_UNSIGNED_CHAR` | `unsigned char` | 1 byte |
 | `MPI_BYTE` | (raw bytes, no type conversion) | 1 byte |
 | `MPI_SHORT` | `signed short int` | 2 bytes |
@@ -53,8 +53,9 @@ built-ins into complex layouts.
 - When interoperability between different platforms with different char signedness matters
 - Network-level byte streams
 
-`MPI_CHAR` corresponds to `signed char` and participates in type checking. Prefer
-`MPI_BYTE` when you are treating the buffer as raw memory.
+`MPI_CHAR` corresponds to `char` (printable character) and participates in type
+checking. `MPI_SIGNED_CHAR` is the separate type for `signed char` as an integral
+value. Prefer `MPI_BYTE` when you are treating the buffer as raw memory.
 
 ### Fixed-Width Types (Preferred for Portability)
 

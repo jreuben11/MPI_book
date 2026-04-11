@@ -259,8 +259,10 @@ double val = rank0_ptr[42];
 This is faster than `MPI_Send`/`MPI_Recv` for intra-node communication, equivalent
 to OpenMP shared-array access.
 
-**Memory ordering**: on x86, load/store have sequential consistency for individual
-accesses. For multi-word updates, use `MPI_Win_sync` to ensure ordering:
+**Memory ordering**: x86 uses Total Store Order (TSO), not full sequential consistency
+— store-load reordering is permitted. The MPI standard requires `MPI_Win_sync` before
+and after load/store accesses to a shared window on all architectures, not only for
+multi-word updates:
 
 ```c
 /* Ensure stores to shared window are visible before other processes read */

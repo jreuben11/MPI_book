@@ -16,7 +16,7 @@
 
 | MPI Type | C Type | Size |
 |---|---|---|
-| `MPI_CHAR` | `signed char` | 1 |
+| `MPI_CHAR` | `char` | 1 |
 | `MPI_UNSIGNED_CHAR` | `unsigned char` | 1 |
 | `MPI_BYTE` | (raw bytes) | 1 |
 | `MPI_WCHAR` | `wchar_t` | 2 or 4 |

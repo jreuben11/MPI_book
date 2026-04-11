@@ -32,10 +32,10 @@ MPI_Comm_size(comm, &size);   /* number of processes in comm  */
 ### Why Context Matters
 
 Suppose a numerical library and your application both call `MPI_Bcast` on
-`MPI_COMM_WORLD` with the same tag. Without context isolation, their messages could
-cross. In practice, well-written libraries create their own communicator with
-`MPI_Comm_dup` so their messages live in a separate context. Chapter 14 covers
-communicator creation.
+`MPI_COMM_WORLD`. Collectives have no tag — they are matched by communicator and call
+order. Without context isolation, their collective calls could cross. In practice,
+well-written libraries create their own communicator with `MPI_Comm_dup` so their
+operations live in a separate context. Chapter 14 covers communicator creation.
 
 ---
 

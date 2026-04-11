@@ -121,8 +121,8 @@ MPI_Win_free(&win);
 ```
 
 With dynamic windows, displacements in RMA calls are absolute memory addresses
-(`MPI_Get_address` values), not relative offsets. Set `disp_unit = 1` for byte
-addressing.
+(`MPI_Get_address` values), not relative offsets. The effective `disp_unit` is fixed
+at 1 by the standard — there is no `disp_unit` parameter on `MPI_Win_create_dynamic`.
 
 ---
 
@@ -224,7 +224,8 @@ Window memory created with `MPI_Win_create` must be freed separately by the user
 | `MPI_Win_free` | — | Collective cleanup |
 
 **Key parameters**: `disp_unit` sets the displacement unit; `size` in bytes.
-For `MPI_Win_create_dynamic`, use `disp_unit = 1` (byte addressing).
+`MPI_Win_create_dynamic` has no `disp_unit` parameter — the standard fixes its
+effective unit at 1 (byte addressing) and uses absolute addresses.
 
 ---
 

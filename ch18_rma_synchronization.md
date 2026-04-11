@@ -90,7 +90,7 @@ int MPI_Win_wait(MPI_Win win);
 /* Origin: declare intent to access a group of targets */
 int MPI_Win_start(MPI_Group group, int assert, MPI_Win win);
 
-/* Origin: signal completion of all RMA operations to targets */
+/* Origin: enforce completion of all RMA operations at the origin (not at target) */
 int MPI_Win_complete(MPI_Win win);
 ```
 

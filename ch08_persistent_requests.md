@@ -142,10 +142,10 @@ Key differences from the non-persistent version:
 ```
 
 A persistent request in the INACTIVE state is **not** `MPI_REQUEST_NULL`. Calling
-`MPI_Wait` on an inactive persistent request is an **error** (the MPI standard
-explicitly prohibits it). Only `MPI_REQUEST_NULL` is safe to pass to `MPI_Wait` as
-a no-op. To safely discard a persistent request, call `MPI_Request_free`, which sets
-it to `MPI_REQUEST_NULL`.
+`MPI_Wait` on an inactive persistent request is explicitly allowed by the MPI standard
+— it returns immediately with empty status. `MPI_REQUEST_NULL` is also safe to pass to
+`MPI_Wait` as a no-op. To free a persistent request, call `MPI_Request_free`, which
+sets it to `MPI_REQUEST_NULL`.
 Calling `MPI_Start` on an active request is also an error.
 
 ---

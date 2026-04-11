@@ -65,7 +65,7 @@ MPI_Is_thread_main(&is_main);
 
 ## 21.3 MPI_THREAD_FUNNELED — Most Common
 
-With `MPI_THREAD_FUNNELED`, only the **master thread** (the one that called
+With `MPI_THREAD_FUNNELED`, only the **main thread** (the one that called
 `MPI_Init_thread`) may call MPI functions. Worker threads do computation only.
 
 This is the easiest model to implement correctly and has the lowest overhead:
@@ -81,11 +81,11 @@ MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
     compute_local_slice(data, tid, nthreads);
 
-    /* Only master thread does MPI */
+    /* Only main thread does MPI */
     #pragma omp master
     {
         /* Pack boundary data (done by master after barrier) */
-        /* MPI communication — only the master thread */
+        /* MPI communication — only the main thread */
         MPI_Allreduce(MPI_IN_PLACE, &global_val, 1, MPI_DOUBLE,
                       MPI_SUM, MPI_COMM_WORLD);
     }
@@ -187,7 +187,7 @@ for (int t = 0; t < nthreads; t++)
 #pragma omp parallel for
 for (int i = 0; i < halo_size; i++) halo_buf[i] = data[boundary_idx[i]];
 
-/* Step 2: exchange halos (MPI, master thread only) */
+/* Step 2: exchange halos (MPI, main thread only) */
 MPI_Sendrecv(halo_buf, halo_size, MPI_DOUBLE, left_rank, 0,
              recv_halo, halo_size, MPI_DOUBLE, right_rank, 0,
              MPI_COMM_WORLD, MPI_STATUS_IGNORE);

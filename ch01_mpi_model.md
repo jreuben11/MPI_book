@@ -85,7 +85,7 @@ silently falls back to slower paths on older implementations.
 | MPI 3.0 | 2012 | Non-blocking collectives, `MPI_T` interface, C++ bindings removed |
 | MPI 3.1 | 2015 | Errata and clarifications; added `MPI_Aint_add`, `MPI_Aint_diff` |
 | MPI 4.0 | 2021 | Sessions, partitioned communication, persistent collectives, large-count `_c` variants |
-| MPI 5.0 | 2025 | Enhanced fault tolerance, RMA clarifications, deprecation cleanup, expanded info keys |
+| MPI 5.0 | 2025 | ABI standardization, RMA clarifications, deprecation cleanup, expanded info keys |
 
 ### What MPI 4.0 Changed (Practically)
 
@@ -110,16 +110,20 @@ everyday code:
 
 ### What MPI 5.0 Changed (Practically)
 
-MPI 5.0 focuses on fault tolerance and cleanup:
+MPI 5.0 focuses on ABI standardization and cleanup:
 
-- **Fault tolerance** (`MPI_Comm_revoke`, `MPI_Comm_shrink`, `MPI_Comm_agree`) — moved
-  from the "experimental" annex into the standard body, with clearer semantics.
+- **ABI standardization** — a standard Application Binary Interface (`mpi_abi` shared
+  library and standardized `mpi.h`) so applications compiled against one MPI
+  implementation can run against any other conforming implementation without
+  recompilation.
 - **RMA memory model clarifications** — the unified memory model is now the default
   recommendation; separate model remains for legacy hardware.
 - **Deprecation cleanup** — several rarely-used functions from MPI 1.x are now formally
   deprecated (though implementations will support them for years).
 - **New `MPI_Info` keys** — standardized keys for binding, memory placement, and
   collective algorithm selection.
+- **Note:** Fault tolerance (`MPIX_Comm_revoke`, `MPIX_Comm_shrink`, `MPIX_Comm_agree`)
+  remains in the `MPIX_` extension namespace and was not standardized in MPI 5.0.
 
 ---
 
@@ -128,7 +132,7 @@ MPI 5.0 focuses on fault tolerance and cleanup:
 ### MPI Fits Well When:
 
 - **Distributed memory is required**: multiple nodes connected by a network (Ethernet,
-  InfiniBand, Slingshot). Shared memory is not available across nodes.
+  InfiniBand, HPE Slingshot https://www.hpe.com/psnow/doc/a50002546enw ). Shared memory is not available across nodes.
 - **Scale exceeds a single machine**: problems that need hundreds or thousands of cores.
 - **Independent data decomposition**: the problem naturally splits into chunks that
   each process owns, with boundary exchanges between neighbors.

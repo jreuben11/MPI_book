@@ -3,7 +3,7 @@
 ## 4.1 The Default Behavior
 
 Out of the box, MPI aborts on any error. Every function returns an integer error code,
-but the default error handler (`MPI_ERRORS_ABORT`) terminates all processes before
+but the default error handler (`MPI_ERRORS_ARE_FATAL`) terminates all processes before
 your code can inspect the return value.
 
 ```c
@@ -68,13 +68,14 @@ Error handlers are attached to communicators, windows, and files.
 
 | Handler | Behavior |
 |---|---|
-| `MPI_ERRORS_ARE_FATAL` | Original name (MPI 1.x–3.x): terminate all processes immediately (default) |
-| `MPI_ERRORS_ABORT` | MPI 4.0+ preferred name; same abort-on-error behavior |
+| `MPI_ERRORS_ARE_FATAL` | Default: terminate all processes immediately on any error |
+| `MPI_ERRORS_ABORT` | MPI 4.0: terminate processes in the communicator scope; distinct from `MPI_ERRORS_ARE_FATAL` |
 | `MPI_ERRORS_RETURN` | Return the error code to the caller; do not abort |
 
-Note: `MPI_ERRORS_ARE_FATAL` is the original name from MPI 1.x–3.x implementations.
-`MPI_ERRORS_ABORT` was introduced in MPI 4.0 as the new preferred name. Both refer
-to the same behavior; prefer `MPI_ERRORS_ARE_FATAL` for portability with pre-4.0 systems.
+Note: `MPI_ERRORS_ARE_FATAL` is the default and has been since MPI 1.0 — it aborts all
+connected processes. `MPI_ERRORS_ABORT` is a separate handler added in MPI 4.0 that
+aborts only the processes in the scope of the communicator/window/file/session it is
+set on, making it more targeted. They are not aliases of each other.
 
 ### Switching to Return-on-Error
 
@@ -239,33 +240,36 @@ Never pass `MPI_STATUSES_IGNORE` if you need to diagnose which request failed.
 
 ## 4.7 Fault Tolerance — MPI 5.0
 
-Standard MPI (before 5.0) offered no mechanism to recover from process failures.
-`MPI_ERRORS_ABORT` was the only real option. MPI 5.0 introduced and standardized
-**User Level Failure Mitigation (ULFM)**.
+Standard MPI offered no mechanism to recover from process failures — `MPI_ERRORS_ARE_FATAL`
+was the only real option. **User Level Failure Mitigation (ULFM)** is an MPI extension
+that adds fault-tolerant operations; it remains in the `MPIX_` extension namespace and
+requires `#include <mpi-ext.h>`.
 
 The three core ULFM operations:
 
 ```c
+#include <mpi-ext.h>   /* required for MPIX_ extensions */
+
 /* Revoke a communicator — all pending operations return MPI_ERR_REVOKED */
-MPI_Comm_revoke(MPI_COMM_WORLD);
+MPIX_Comm_revoke(MPI_COMM_WORLD);
 
 /* Create a new communicator excluding failed processes */
 MPI_Comm survivor_comm;
-MPI_Comm_shrink(MPI_COMM_WORLD, &survivor_comm);
+MPIX_Comm_shrink(MPI_COMM_WORLD, &survivor_comm);
 
 /* Reach collective agreement on a value across surviving processes */
 int failed = 1;
-MPI_Comm_agree(survivor_comm, &failed);
+MPIX_Comm_agree(survivor_comm, &failed);
 ```
 
 Full fault tolerance requires rethinking your entire communication pattern — checkpoint
 protocols, data redistribution across reduced process sets, and replaying work. This is
-an advanced topic beyond the scope of this guide. The key takeaway for MPI 5.0 users:
+an advanced topic beyond the scope of this guide.
 
-1. The ULFM API is now standard — you can use it without implementation-specific flags.
-2. For most HPC codes, checkpoint/restart at the application level remains the
-   practical fault tolerance strategy. ULFM enables automated restart without
-   re-spawning the job.
+For most HPC codes, checkpoint/restart at the application level remains the practical
+fault tolerance strategy (see Chapter 35). ULFM enables automated restart without
+re-spawning the job, but requires implementation support and the `MPIX_` extension
+namespace.
 
 ---
 
@@ -299,13 +303,13 @@ MPI_Errhandler_free(&saved);
 
 | Topic | Key Points |
 |---|---|
-| Default handler | `MPI_ERRORS_ABORT` — terminates all processes on any error |
+| Default handler | `MPI_ERRORS_ARE_FATAL` — terminates all processes on any error |
 | `MPI_ERRORS_RETURN` | Switches to return-code mode; you must check return values |
 | Error string | `MPI_Error_string(rc, str, &len)` gives a human-readable message |
 | Error class | `MPI_Error_class(rc, &class)` gives a portable category |
 | `MPI_Abort` | Emergency stop; not a clean shutdown; does not run destructors |
 | `MPI_Waitall` errors | Returns `MPI_ERR_IN_STATUS`; check each `status.MPI_ERROR` |
-| ULFM (MPI 5.0) | `Revoke` / `Shrink` / `Agree` for fault-tolerant recovery |
+| ULFM (extension) | `MPIX_Comm_revoke` / `MPIX_Comm_shrink` / `MPIX_Comm_agree`; requires `<mpi-ext.h>` |
 | Library rule | Save/restore caller's error handler; use `MPI_Comm_dup` |
 
 ---

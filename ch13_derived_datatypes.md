@@ -190,8 +190,10 @@ Element 2 starts at: buf + 2 * extent
 ```
 
 For derived types, the extent may not match your intention. A column-type created with
-`MPI_Type_vector` has an extent that extends from the first element to one stride past
-the last block — not to the start of the next column.
+`MPI_Type_vector(count, block, stride, ...)` has an extent of
+`(stride × (count−1) + block) × extent(oldtype)` — it ends at the end of the last
+block, not one full stride past it. This is typically not the start of the next
+column in a 2D array.
 
 Use `MPI_Type_create_resized` to explicitly set extent and lower bound:
 

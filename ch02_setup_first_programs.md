@@ -27,6 +27,7 @@ brew install mpich
 ### Cluster / HPC Systems
 
 On clusters, MPI is almost always installed as an **environment module**:
+(Lmod is a Lua based module system that easily handles the MODULEPATH Hierarchical problem https://lmod.readthedocs.io/en/latest/)
 
 ```bash
 module avail mpi          # list available MPI modules
@@ -227,8 +228,9 @@ MPI_Initialized(&flag);  // flag = 1 if MPI_Init has been called
 MPI_Finalized(&flag);    // flag = 1 if MPI_Finalize has been called
 ```
 
-These are the only two MPI functions safe to call before `MPI_Init` or after
-`MPI_Finalize`. Libraries use them to avoid re-initializing MPI.
+`MPI_Initialized`, `MPI_Finalized`, `MPI_Get_version`, and `MPI_Get_library_version`
+are the MPI functions safe to call before `MPI_Init` or after `MPI_Finalize`.
+Libraries use `MPI_Initialized` and `MPI_Finalized` to avoid re-initializing MPI.
 
 ---
 
@@ -439,7 +441,7 @@ Useful constants:
 | Constant | Value | Meaning |
 |---|---|---|
 | `MPI_MAX_PROCESSOR_NAME` | ≥128 | Max length of processor name string |
-| `MPI_MAX_ERROR_STRING` | ≥256 | Max length of error string |
+| `MPI_MAX_ERROR_STRING` | ≥512 | Max length of error string |
 | `MPI_MAX_LIBRARY_VERSION_STRING` | ≥8192 | Max length of library version string |
 | `MPI_MAX_OBJECT_NAME` | ≥128 | Max length of communicator/window/file name |
 
@@ -477,6 +479,8 @@ public:
     // Non-copyable, non-movable
     MPIGuard(const MPIGuard &) = delete;
     MPIGuard &operator=(const MPIGuard &) = delete;
+    MPIGuard(MPIGuard &&) = delete;
+    MPIGuard &operator=(MPIGuard &&) = delete;
 
     int rank() const {
         int r; MPI_Comm_rank(MPI_COMM_WORLD, &r); return r;

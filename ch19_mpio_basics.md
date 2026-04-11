@@ -264,9 +264,9 @@ compute_next_step();
 MPI_Wait(&io_req, MPI_STATUS_IGNORE);
 ```
 
-Non-blocking collective variants (MPI 3.1): `MPI_File_iread_at_all` and
+Non-blocking collective variants (MPI 3.0): `MPI_File_iread_at_all` and
 `MPI_File_iwrite_at_all` (at explicit offset, collective), plus `MPI_File_iread_all`
-and `MPI_File_iwrite_all` (using the current file view and individual file pointer).
+and `MPI_File_iwrite_all` (using the individual file pointer).
 
 ---
 
