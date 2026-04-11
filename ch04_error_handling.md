@@ -238,38 +238,166 @@ Never pass `MPI_STATUSES_IGNORE` if you need to diagnose which request failed.
 
 ---
 
-## 4.7 Fault Tolerance — MPI 5.0
+## 4.7 Fault Tolerance and the MPIX_ Extension Namespace
+
+### The MPIX_ Namespace
+
+`MPIX_` is the reserved prefix for MPI extensions that have not yet been incorporated
+into the standard. These are:
+
+- **Experimental features** under active standardization debate
+- **Implementation-specific extensions** adopted by multiple vendors as de facto standards
+- **Post-deadline additions** to a ratified standard that will be merged in the next version
+
+All `MPIX_` functions require `#include <mpi-ext.h>`. They may disappear, be renamed,
+or gain an `MPI_` prefix in a future standard version. Code using them should guard
+availability with compile-time checks.
+
+---
+
+### User Level Failure Mitigation (ULFM)
 
 Standard MPI offered no mechanism to recover from process failures — `MPI_ERRORS_ARE_FATAL`
-was the only real option. **User Level Failure Mitigation (ULFM)** is an MPI extension
-that adds fault-tolerant operations; it remains in the `MPIX_` extension namespace and
-requires `#include <mpi-ext.h>`.
+was the only real option. **ULFM** adds fault-tolerant operations; it remains in the
+`MPIX_` extension namespace despite decades of development.
 
-The three core ULFM operations:
+#### New Error Codes
+
+ULFM introduces three new error codes:
+
+| Code | Meaning |
+|---|---|
+| `MPIX_ERR_PROC_FAILED` | A remote process has failed; a P2P or collective operation cannot complete |
+| `MPIX_ERR_PROC_FAILED_PENDING` | A process may have failed while a non-blocking operation was in flight |
+| `MPIX_ERR_REVOKED` | The operation was issued on a communicator that has been revoked |
+
+These codes are returned (not fatal-abort) only when `MPI_ERRORS_RETURN` is active.
+
+#### ULFM Functions
 
 ```c
-#include <mpi-ext.h>   /* required for MPIX_ extensions */
+#include <mpi-ext.h>   /* required for all MPIX_ extensions */
 
-/* Revoke a communicator — all pending operations return MPI_ERR_REVOKED */
-MPIX_Comm_revoke(MPI_COMM_WORLD);
+/* Step 1: Revoke — broadcast "something went wrong" to all processes.
+   All pending and future operations on comm return MPI_ERR_REVOKED.
+   Non-collective: any process may call this unilaterally. */
+int MPIX_Comm_revoke(MPI_Comm comm);
 
-/* Create a new communicator excluding failed processes */
-MPI_Comm survivor_comm;
-MPIX_Comm_shrink(MPI_COMM_WORLD, &survivor_comm);
+/* Step 2: Shrink — collective across all *surviving* processes.
+   Creates a new communicator that excludes every process that has failed.
+   Like MPI_Comm_create but failure-aware; survivors must all call this. */
+int MPIX_Comm_shrink(MPI_Comm comm, MPI_Comm *newcomm);
 
-/* Reach collective agreement on a value across surviving processes */
-int failed = 1;
-MPIX_Comm_agree(survivor_comm, &failed);
+/* Step 3: Acknowledge failures — clears the "unacknowledged failure" state
+   on comm so that subsequent operations no longer return MPIX_ERR_PROC_FAILED.
+   Must be called before reusing an old communicator after failure. */
+int MPIX_Comm_failure_ack(MPI_Comm comm);
+
+/* Step 4: Query acknowledged failures — returns the MPI_Group of all
+   processes that have been acknowledged as failed via MPIX_Comm_failure_ack. */
+int MPIX_Comm_failure_get_acked(MPI_Comm comm, MPI_Group *failedgrp);
+
+/* Agreement — collective AND-reduction of flag across surviving processes,
+   tolerant of concurrent failures. Used to agree on whether recovery succeeded.
+   flag is ANDed: if any survivor passes 0, all see 0 on return. */
+int MPIX_Comm_agree(MPI_Comm comm, int *flag);
+
+/* Non-blocking agreement — initiates agreement, complete with MPI_Wait. */
+int MPIX_Comm_iagree(MPI_Comm comm, int *flag, MPI_Request *request);
 ```
 
-Full fault tolerance requires rethinking your entire communication pattern — checkpoint
-protocols, data redistribution across reduced process sets, and replaying work. This is
-an advanced topic beyond the scope of this guide.
+**Why `MPIX_Comm_shrink` matters**: it is the only standard-track way to create a
+valid MPI communicator from a process set where some members have died. Unlike
+`MPI_Comm_create`, which requires all processes in the old group to participate,
+`MPIX_Comm_shrink` proceeds with whoever is still alive. It uses an internal
+consensus protocol to determine exactly which ranks failed before building the new
+communicator's rank mapping.
 
-For most HPC codes, checkpoint/restart at the application level remains the practical
-fault tolerance strategy (see Chapter 35). ULFM enables automated restart without
-re-spawning the job, but requires implementation support and the `MPIX_` extension
-namespace.
+#### Typical ULFM Recovery Pattern
+
+```c
+#include <mpi.h>
+#include <mpi-ext.h>
+
+MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+/* --- application loop --- */
+int rc = MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_SUM, world_comm);
+
+if (rc == MPIX_ERR_PROC_FAILED || rc == MPIX_ERR_REVOKED) {
+
+    /* Step 1: revoke so all survivors see a consistent error state */
+    MPIX_Comm_revoke(world_comm);
+
+    /* Step 2: build a communicator from survivors */
+    MPI_Comm survivor_comm;
+    MPIX_Comm_shrink(world_comm, &survivor_comm);
+
+    /* Step 3: agree — did all survivors detect the failure? */
+    int all_agreed = 1;
+    MPIX_Comm_agree(survivor_comm, &all_agreed);
+
+    if (all_agreed) {
+        /* Step 4: free the old communicator; continue with survivors */
+        MPI_Comm_free(&world_comm);
+        world_comm = survivor_comm;
+        /* redistribute data, reload checkpoint, continue ... */
+    } else {
+        MPI_Abort(survivor_comm, 1);
+    }
+}
+```
+
+Full fault tolerance requires checkpoint protocols, data redistribution across the
+reduced process set, and replaying partial work. For most HPC codes, application-level
+checkpoint/restart (Chapter 35) remains the practical strategy. ULFM enables automated
+recovery without re-queuing the job, but requires implementation support (Open MPI 5.x
+with `--with-ft=ulfm`; experimental in MPICH).
+
+---
+
+### GPU Support Queries
+
+Several MPI implementations expose GPU-awareness queries under `MPIX_`:
+
+```c
+#include <mpi-ext.h>
+
+/* Open MPI: returns 1 if the library was built with CUDA-aware support */
+int cuda_ok = MPIX_Query_cuda_support();
+
+/* Open MPI: returns 1 if built with ROCm/HIP-aware support */
+int rocm_ok = MPIX_Query_rocm_support();
+
+/* Open MPI: returns 1 if built with oneAPI Level Zero (Intel GPU) support */
+int ze_ok = MPIX_Query_ze_support();
+```
+
+Use these at startup to gate code paths that pass device pointers directly to MPI.
+Passing a GPU pointer to a non-GPU-aware MPI results in a segfault or silent
+data corruption, not a catchable error.
+
+```c
+if (!MPIX_Query_cuda_support()) {
+    fprintf(stderr, "MPI library is not CUDA-aware — cannot use device pointers\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+}
+/* safe to call MPI_Send with a cudaMalloc'd pointer */
+```
+
+These functions are Open MPI-specific; MPICH exposes the same information through
+`MPIR_CVAR_CH4_OFI_ENABLE_GPU` environment inspection or compile-time defines.
+
+---
+
+### Other MPIX_ Extensions
+
+| Extension | Description |
+|---|---|
+| `MPIX_Isendrecv` | Non-blocking `MPI_Sendrecv`; not yet standardized but provided by Open MPI and MPICH as an extension |
+| `MPIX_Comm_get_failed` | Like `MPIX_Comm_failure_get_acked` but without requiring prior `ack`; returns the current set of failed processes |
+| `MPIX_Grequest_start` / `MPIX_Grequest_class_*` | Extended generalized requests (MPICH extension) for integrating non-MPI async operations into `MPI_Wait` |
+| `MPIX_Status_f082f` / `MPIX_Status_f082c` | Fortran 2008 status conversion helpers (rarely needed in C/C++) |
 
 ---
 
@@ -309,7 +437,11 @@ MPI_Errhandler_free(&saved);
 | Error class | `MPI_Error_class(rc, &class)` gives a portable category |
 | `MPI_Abort` | Emergency stop; not a clean shutdown; does not run destructors |
 | `MPI_Waitall` errors | Returns `MPI_ERR_IN_STATUS`; check each `status.MPI_ERROR` |
-| ULFM (extension) | `MPIX_Comm_revoke` / `MPIX_Comm_shrink` / `MPIX_Comm_agree`; requires `<mpi-ext.h>` |
+| ULFM error codes | `MPIX_ERR_PROC_FAILED`, `MPIX_ERR_PROC_FAILED_PENDING`, `MPIX_ERR_REVOKED` |
+| ULFM revoke | `MPIX_Comm_revoke` — unilateral; signals all pending ops to return `MPI_ERR_REVOKED` |
+| ULFM shrink | `MPIX_Comm_shrink` — collective over survivors; builds a new communicator excluding failed ranks |
+| ULFM ack/agree | `MPIX_Comm_failure_ack` / `MPIX_Comm_failure_get_acked` / `MPIX_Comm_agree` |
+| GPU queries | `MPIX_Query_cuda_support()`, `MPIX_Query_rocm_support()`, `MPIX_Query_ze_support()` (Open MPI) |
 | Library rule | Save/restore caller's error handler; use `MPI_Comm_dup` |
 
 ---
