@@ -7,6 +7,50 @@ Covers the practical 20% of the API used in 80% of real HPC programs.
 
 ---
 
+## MPI in the NVIDIA Ecosystem
+
+MPI (Message Passing Interface) is essentially the **backbone of multi-node GPU computing**. NVIDIA has invested heavily in making it work *transparently and efficiently* with their hardware (GPUDirect, CUDA-aware MPI, HPC-X), particularly in high-performance computing (HPC) and AI/ML at scale. 
+
+---
+
+### Core Integration Points
+
+**CUDA-Aware MPI**
+NVIDIA GPUs and MPI are deeply integrated through *CUDA-aware MPI* implementations (OpenMPI, MVAPICH2, Cray MPICH). This allows MPI routines to directly pass GPU memory pointers, eliminating costly GPU→CPU→GPU data copies during inter-node communication.
+
+**NCCL + MPI**
+NVIDIA's own *NCCL (NVIDIA Collective Communications Library)* is often used *alongside* MPI — MPI handles CPU-side process management and point-to-point messaging, while NCCL handles GPU-optimized collectives (AllReduce, Broadcast, etc.).
+
+**GPUDirect**
+NVIDIA's *GPUDirect RDMA* technology allows MPI to transfer data directly between GPUs across nodes via InfiniBand, bypassing the CPU and system memory entirely — a massive bandwidth win in tightly coupled clusters.
+
+---
+
+### Relevance to AI/ML
+
+Modern distributed training frameworks lean heavily on MPI concepts:
+
+- **PyTorch Distributed** supports an MPI backend and its design mirrors MPI collective semantics.
+- **Horovod** (Uber's distributed training library) was originally built on MPI and still supports it.
+- **SLURM + MPI** is the dominant way to launch multi-node GPU jobs on HPC clusters.
+- **DeepSpeed** and **Megatron-LM** can use MPI for process bootstrapping.
+
+---
+
+### 🖥️ NVIDIA's Own Tooling
+
+NVIDIA actively supports and ships MPI-compatible software:
+
+| Tool | MPI Role |
+|---|---|
+| **HPC-X** | NVIDIA's own MPI toolkit (OpenMPI + UCX + NCCL) |
+| **NVSHMEM** | GPU-native PGAS model, interoperable with MPI |
+| **Magnum IO** | I/O stack that complements MPI communication |
+| **DGX SuperPOD** | Reference architecture assumes MPI-based workloads |
+
+
+---
+
 ## Quick Start
 
 ```bash

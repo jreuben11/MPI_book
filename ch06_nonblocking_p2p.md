@@ -212,8 +212,108 @@ For most code, `MPI_Request_free` is unnecessary. Use `MPI_Wait` instead.
 
 ## 6.5 Halo Exchange Pattern
 
-The canonical use of non-blocking communication is a 1D or multi-dimensional halo
-(ghost cell) exchange, used in stencil computations:
+### Stencil Computations
+
+A **stencil** updates every point in a grid from a fixed neighborhood of surrounding
+points. The update rule is applied at every grid point, repeatedly over many time
+steps or solver iterations. Common stencils:
+
+| Stencil | Dimensions | Points used | Typical application |
+|---|---|---|---|
+| 3-point | 1D | center ± 1 | 1D diffusion, tridiagonal solvers |
+| 5-point (star) | 2D | N/S/E/W + center | 2D Laplace, heat equation |
+| 9-point (box) | 2D | all 8 neighbors + center | Isotropic diffusion |
+| 7-point | 3D | 6 faces + center | 3D heat, Poisson equation |
+| 27-point | 3D | all face/edge/corner + center | Higher-order 3D solvers |
+
+A **4th-order** stencil uses a radius of 2 (±2 neighbors per axis) instead of 1,
+improving accuracy at the cost of a wider neighborhood dependency.
+
+A minimal 1D heat equation stencil:
+
+```c
+/* One time step of explicit 1D heat diffusion */
+for (int i = 1; i < N-1; i++)
+    u_new[i] = u[i] + dt * (u[i-1] - 2*u[i] + u[i+1]) / (dx*dx);
+```
+
+This is representative of all stencil codes: each updated cell depends only on a
+fixed set of neighbors, the neighborhood radius is small and uniform, and the same
+rule applies at every interior point. Iterative solvers (Jacobi, Gauss-Seidel,
+conjugate gradient) use this structure at their core.
+
+### Domain Decomposition
+
+To parallelize a stencil, the grid is partitioned among MPI ranks. Each rank owns a
+contiguous sub-domain and is solely responsible for updating the points within it.
+
+**1D decomposition** (slabs): each rank gets a contiguous block of rows or columns.
+Simple to implement; each rank has at most 2 neighbors.
+
+```
+Global array (16 elements, 4 ranks):
+  Rank 0        Rank 1        Rank 2        Rank 3
+ [0  1  2  3] [4  5  6  7] [8  9 10 11] [12 13 14 15]
+```
+
+**2D decomposition** (tiles): for a 2D grid, each rank owns a rectangular tile.
+Each rank has up to 4 neighbors (8 with diagonals for 9-point stencils). The key
+advantage is a better **surface-to-volume ratio** — the amount of data exchanged
+per step grows as O(N/√P) instead of O(N):
+
+```
+8×8 global grid, 4 ranks (2×2 tile layout):
+
+  ┌─────────┬─────────┐
+  │  Rank 0 │  Rank 1 │
+  │  4×4    │  4×4    │
+  ├─────────┼─────────┤
+  │  Rank 2 │  Rank 3 │
+  │  4×4    │  4×4    │
+  └─────────┴─────────┘
+```
+
+**3D decomposition** (sub-volumes): for 3D simulations (CFD, molecular dynamics,
+climate models), each rank gets a 3D brick with up to 6 face neighbors.
+
+As a rule: use the decomposition that most closely matches the dimensionality of
+your problem. More neighbors means more messages but fewer bytes per message.
+
+### Ghost Cells (Halos)
+
+When a rank applies a stencil near the edge of its sub-domain, it needs values from
+cells owned by a neighboring rank. Those values are pre-fetched and stored in a
+layer of extra storage called **ghost cells** (also called **halo cells** or
+**overlap cells**) surrounding the rank's local array.
+
+```
+Rank 1's local array with halo width = 1:
+
+  ┌──────┬───────────────────────────────┬──────┐
+  │ghost │   owned interior cells        │ghost │
+  │ ← from Rank 0              from Rank 2 →   │
+  └──────┴───────────────────────────────┴──────┘
+   index 0   index 1 ... index local_N   index local_N+1
+```
+
+The **halo width** equals the stencil radius:
+- 3-point or 5-point stencil (radius 1): 1 ghost layer per side
+- 4th-order stencil (radius 2): 2 ghost layers per side
+
+After each time step, each rank's interior changes, so its neighbors' ghost copies
+become stale. The **halo exchange** refreshes them:
+
+1. Send this rank's boundary cells to each neighbor.
+2. Receive neighbors' boundary cells into local ghost slots.
+3. Apply stencil to **interior** cells (no ghost data needed) — this can overlap with steps 1–2.
+4. Wait for the exchange to complete.
+5. Apply stencil to **boundary** cells (which depend on the now-fresh ghost data).
+
+This split between interior and boundary work is the key optimization: posting
+non-blocking sends/receives, then computing the interior, hides most or all of
+the communication latency.
+
+### Implementation — 1D Halo Exchange
 
 ```c
 /* 1D domain decomposition — each rank owns a slab of a 1D array */
@@ -251,10 +351,15 @@ compute_boundary_stencil(local, local_N);
 Key points in this pattern:
 - **Post receives before sends**: avoids a race where the sender's buffer is consumed
   before the receiver's buffer is ready. Most implementations handle this correctly
-  either way, but posting Irecv before Isend is the standard convention.
-- **Overlap interior computation**: the interior cells do not depend on halo data, so
-  they can be computed while halo exchange is in progress.
-- **Use `MPI_REQUEST_NULL`** for boundary ranks that have no left or right neighbor.
+  either way, but posting `MPI_Irecv` before `MPI_Isend` is the standard convention.
+- **Overlap interior computation**: interior cells (indices 2 through local_N−1) do not
+  depend on ghost data, so the stencil over them can run concurrently with the exchange.
+  Only the boundary cells (indices 1 and local_N) need to wait for the halos to arrive.
+- **Use `MPI_REQUEST_NULL`** for boundary ranks (rank 0 has no left neighbor; rank
+  size−1 has no right neighbor). `MPI_Waitall` silently skips null requests.
+- **Halo width**: this example uses width 1 (a single ghost cell each side), matching
+  a 3-point stencil. A 4th-order stencil would require width 2 — send two boundary
+  cells, allocate two ghost slots, and shift the index arithmetic accordingly.
 
 ---
 
