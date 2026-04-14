@@ -139,23 +139,202 @@ MPI_Allreduce_c(MPI_IN_PLACE, buf, count, MPI_DOUBLE, MPI_SUM, comm);
 
 ## 12.5 Special Types
 
-### MPI_Aint, MPI_Offset, MPI_Count as Datatypes
+### MPI_Aint — Address Integer
 
-These address/offset types also have MPI datatype equivalents for communicating
-pointer-sized or file-offset values:
+`MPI_Aint` is a **signed integer type** guaranteed to be wide enough to hold any
+byte address or byte displacement on the current platform. On 64-bit systems it is
+8 bytes; on 32-bit systems it is 4 bytes. It is analogous to `ptrdiff_t` or
+`intptr_t` from `<stdint.h>`, but defined by MPI for use in all datatype and RMA APIs.
+
+
+
+Note: 
+- `ptrdiff_t`  - defined in `<stddef.h>` or `<cstddef>` for the result of subtracting two pointers. It is used for pointer arithmetic and array indexing when negative values are possible.
+
+- `intptr_t` - defined in `<stdint.h>` or `<cstdint>` as a signed integer type for holding a `void*` pointer. Used to convert a pointer to an integer (and back) without losing data, allowing you to store pointer addresses in integer variables.
+
+
+**Where it appears:**
+
+- Displacement arrays in `MPI_Type_create_struct` and `MPI_Type_create_hindexed`
+- Lower-bound and extent in `MPI_Type_get_extent` / `MPI_Type_create_resized`
+- Displacement argument to `MPI_Get`, `MPI_Put`, `MPI_Accumulate` (RMA)
+- Return value of `MPI_Get_address`
+
+**Getting an address:**
+
+```c
+/* MPI_Get_address is the correct way to obtain an MPI_Aint address.
+   Do NOT cast a pointer to MPI_Aint directly — use this function. */
+double matrix[100][100];
+MPI_Aint addr_00, addr_10;
+MPI_Get_address(&matrix[0][0], &addr_00);
+MPI_Get_address(&matrix[1][0], &addr_10);
+MPI_Aint row_stride = addr_10 - addr_00;   /* bytes between rows */
+```
+
+**Arithmetic helpers (MPI 3.1+):**
+
+Pointer arithmetic on `MPI_Aint` values must be done carefully on 32-bit platforms
+where overflow can occur. MPI 3.1 added two safe arithmetic functions:
+
+```c
+/* MPI_Aint_add: returns base + disp, safe on 32-bit */
+MPI_Aint displaced = MPI_Aint_add(base_addr, byte_offset);
+
+/* MPI_Aint_diff: returns addr1 - addr2, result is a signed byte displacement */
+MPI_Aint diff = MPI_Aint_diff(addr1, addr2);
+```
+
+Prefer these over plain `base_addr + offset` arithmetic — the standard arithmetic
+will overflow on 32-bit if `base_addr` is near the top of the address space.
+
+**Broadcasting addresses (RDMA / shared memory setup):**
+
+```c
+/* Share memory addresses across ranks for RMA window setup */
+MPI_Aint base_addr;
+MPI_Get_address(shared_buffer, &base_addr);
+MPI_Bcast(&base_addr, 1, MPI_AINT, 0, comm);
+```
+
+**Common mistake — `int` displacement overflow:**
+
+```c
+/* WRONG: displacement computed as int, overflows beyond 2 GB */
+int displacements[3];
+displacements[0] = 0;
+displacements[1] = sizeof(double) * 1000000000;  /* overflow! */
+
+/* CORRECT: use MPI_Aint for byte displacements */
+MPI_Aint displacements[3];
+MPI_Get_address(&buf[0],          &displacements[0]);
+MPI_Get_address(&buf[1000000000], &displacements[1]);
+displacements[1] = MPI_Aint_diff(displacements[1], displacements[0]);
+displacements[0] = 0;
+```
+
+---
+
+### MPI_Offset — File Position
+
+`MPI_Offset` is a **signed 64-bit integer** used exclusively for file byte positions
+in MPI-IO. It is always 64 bits regardless of platform — unlike POSIX `off_t`, which
+is 32 bits on 32-bit Linux unless `_FILE_OFFSET_BITS=64` is set.
+
+`MPI_Offset` can address files up to 2^63 bytes (~9.2 EB), covering any realistic
+parallel I/O scenario.
+
+**Where it appears:**
+
+- `MPI_File_seek` / `MPI_File_seek_shared` — position the file pointer
+- `MPI_File_read_at` / `MPI_File_write_at` and their variants — explicit offset I/O
+- `MPI_File_get_position` / `MPI_File_get_byte_offset` — query current position
+- `MPI_File_set_view` — the `disp` (displacement) argument is `MPI_Offset`
+
+```c
+/* Write each rank's data at a calculated byte offset in a shared file */
+MPI_File fh;
+MPI_File_open(comm, "output.dat", MPI_MODE_CREATE | MPI_MODE_WRONLY,
+              MPI_INFO_NULL, &fh);
+
+MPI_Offset my_offset = (MPI_Offset)rank * local_N * sizeof(double);
+MPI_File_write_at(fh, my_offset, local_data, local_N, MPI_DOUBLE,
+                  MPI_STATUS_IGNORE);
+
+MPI_File_close(&fh);
+```
+
+**Why not use `long` or `size_t`?**
+
+`long` is 4 bytes on Windows 64-bit. `size_t` is unsigned (can't represent
+negative seek offsets from `MPI_SEEK_END`). `MPI_Offset` is always the right type
+and the only one accepted by MPI-IO functions.
+
+```c
+/* MPI_File_seek with negative offset from end — requires signed type */
+MPI_Offset footer_offset = -1024;
+MPI_File_seek(fh, footer_offset, MPI_SEEK_END);
+```
+
+---
+
+### MPI_Count — Large Element Count
+
+`MPI_Count` is a **signed 64-bit integer** for element counts that exceed the
+capacity of `int` (2^31 − 1 ≈ 2.1 billion). It was introduced in MPI 3.0
+specifically for status queries, and MPI 4.0 extended it to all communication
+functions via the `_c`-suffix API.
+
+**Where it appears:**
+
+- `MPI_Get_count_x` / `MPI_Get_elements_x` — query the count of a received message as `MPI_Count`
+- `MPI_Type_size_x` — returns the size of a datatype as `MPI_Count`
+- `MPI_Status_set_elements_x` — set element count in a generalized request status
+- All `_c` suffix functions: `MPI_Send_c`, `MPI_Recv_c`, `MPI_Bcast_c`, `MPI_Allreduce_c`, etc.
+- `MPI_Type_contiguous_c`, `MPI_Type_vector_c`, etc. — large-count datatype constructors
+
+**Querying received count:**
+
+```c
+MPI_Status status;
+MPI_Recv(buf, INT_MAX, MPI_DOUBLE, src, tag, comm, &status);
+
+/* MPI_Get_count returns int — saturates to MPI_UNDEFINED if count > INT_MAX */
+int count_int;
+MPI_Get_count(&status, MPI_DOUBLE, &count_int);
+if (count_int == MPI_UNDEFINED) { /* received more than INT_MAX elements */ }
+
+/* MPI_Get_count_x always works regardless of size */
+MPI_Count count_x;
+MPI_Get_count_x(&status, MPI_DOUBLE, &count_x);
+```
+
+**Querying type size:**
+
+```c
+/* MPI_Type_size returns int — overflows for types larger than ~2 GB */
+int sz_int;
+MPI_Type_size(my_big_type, &sz_int);   /* may be wrong for very large derived types */
+
+/* MPI_Type_size_x returns MPI_Count — always correct */
+MPI_Count sz;
+MPI_Type_size_x(my_big_type, &sz);
+```
+
+**Sending more than 2^31 elements:**
+
+```c
+MPI_Count big_count = 5000000000LL;   /* 5 × 10^9 doubles = 40 GB */
+double *buf = malloc(big_count * sizeof(double));
+
+/* _c variants accept MPI_Count */
+MPI_Send_c(buf, big_count, MPI_DOUBLE, dest, tag, comm);
+MPI_Recv_c(buf, big_count, MPI_DOUBLE, src,  tag, comm, MPI_STATUS_IGNORE);
+MPI_Allreduce_c(MPI_IN_PLACE, buf, big_count, MPI_DOUBLE, MPI_SUM, comm);
+```
+
+**`MPI_UNDEFINED`**: the sentinel value (always −1) returned by count queries when
+a count is not representable or not available. Check for it when calling the
+non-`_x` count query functions on large messages.
+
+---
+
+### Summary of the Three Types
+
+| Type | Width | Signed? | Domain | Arithmetic helpers |
+|---|---|---|---|---|
+| `MPI_Aint` | Platform (4 or 8 bytes) | Yes | Byte addresses and displacements | `MPI_Aint_add`, `MPI_Aint_diff` (MPI 3.1) |
+| `MPI_Offset` | Always 64-bit | Yes | MPI-IO file byte positions | Plain `+`/`-` (always 64-bit, no overflow risk) |
+| `MPI_Count` | Always 64-bit | Yes | Element counts | Plain `+`/`-` ; use `_c` API and `_x` query functions |
+
+Each has a corresponding MPI predefined datatype for communication:
 
 | C Type | MPI Datatype |
 |---|---|
 | `MPI_Aint` | `MPI_AINT` |
 | `MPI_Offset` | `MPI_OFFSET` |
 | `MPI_Count` | `MPI_COUNT` |
-
-```c
-/* Share memory addresses across ranks (for shared memory or RDMA setup) */
-MPI_Aint base_addr;
-MPI_Get_address(shared_buffer, &base_addr);
-MPI_Bcast(&base_addr, 1, MPI_AINT, 0, comm);
-```
 
 ### MPI_PACKED
 
@@ -208,8 +387,10 @@ MPI_Type_set_name(my_type, "my_struct_type");
 | Fixed-width types | Use `MPI_INT32_T`, `MPI_INT64_T` etc. for cross-platform portability |
 | `MPI_BYTE` | Raw bytes; no type conversion; use for serialized data |
 | `MPI_Type_size_x` | Returns `MPI_Count`; use instead of `MPI_Type_size` for large types |
-| `MPI_Count` / `_c` variants | MPI 3.0/4.0: enables >2^31 element messages |
-| `MPI_AINT`, `MPI_OFFSET` | Communicate pointer/file offset values |
+| `MPI_Aint` | Platform-wide signed address integer; use `MPI_Get_address` and `MPI_Aint_add`/`diff` |
+| `MPI_Offset` | Always 64-bit signed; MPI-IO file byte positions; replaces `off_t` |
+| `MPI_Count` / `_c` variants | Always 64-bit signed; MPI 3.0/4.0: enables >2^31 element messages; use `_x` queries |
+| `MPI_AINT`, `MPI_OFFSET`, `MPI_COUNT` | Predefined datatypes for communicating these values |
 | Avoid `MPI_Pack` | Use derived datatypes instead for structured data |
 
 ---

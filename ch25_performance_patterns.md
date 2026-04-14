@@ -183,8 +183,155 @@ bottleneck.
 
 ## 25.6 NUMA-Aware Placement
 
-On multi-socket nodes, NUMA (Non-Uniform Memory Access) effects can reduce bandwidth
-by 2–3× if processes access memory on a remote socket.
+### What NUMA Is
+
+Modern servers contain multiple CPU sockets, each with its own local DRAM attached
+via a dedicated memory bus. All sockets are connected by a high-speed inter-socket
+fabric (Intel UPI, AMD Infinity Fabric, IBM X-Bus). The entire physical memory is
+addressable from any socket, but **access time differs depending on where the memory
+lives**:
+
+```
+Socket 0                         Socket 1
+┌─────────────────────┐          ┌─────────────────────┐
+│  Core 0–31          │          │  Core 32–63         │
+│  L1/L2/L3 cache     │          │  L1/L2/L3 cache     │
+│  Memory controller  │◄──UPI───►│  Memory controller  │
+└────────┬────────────┘          └────────┬────────────┘
+         │                                │
+      DRAM bank 0                      DRAM bank 1
+   (local to Socket 0)             (local to Socket 1)
+```
+
+| Access path | Typical latency | Typical bandwidth |
+|---|---|---|
+| Local DRAM (same socket) | ~80 ns | ~150 GB/s |
+| Remote DRAM (cross-socket via UPI) | ~140 ns | ~60–80 GB/s |
+
+The ratio between local and remote bandwidth is typically **1.5–3×**. For
+bandwidth-bound HPC kernels (stencils, BLAS, FFT), accessing remote DRAM is the
+difference between achieving peak performance and running at half speed.
+
+Each socket (and sometimes each NUMA domain within a socket on AMD EPYC) is called
+a **NUMA node**. The OS assigns physical pages to NUMA nodes. The default policy on
+Linux is **first-touch**: a page is allocated on the NUMA node of the thread that
+first writes to it, regardless of which thread later reads it.
+
+* Note: NUMA effects only arise on **multi-socket** machines. A single-socket workstation has
+one memory controller and uniform access to all DRAM — `numactl --hardware` will show
+`available: 1 nodes (0)` and a distance matrix of just `10`. The content above applies
+to HPC cluster nodes, which are almost always dual- or quad-socket (e.g., 2× AMD EPYC
+or 2× Intel Xeon per node).
+
+**First-touch trap**: if a single thread (e.g., the main thread on socket 0)
+initialises a large array with `memset` or a serial loop, all pages land on socket 0.
+Worker threads on socket 1 then access that data remotely for the entire run.
+
+```c
+/* Bad: all pages land on socket 0 (initializing thread) */
+double *buf = malloc(N * sizeof(double));
+memset(buf, 0, N * sizeof(double));   /* first touch from socket 0 only */
+
+/* Good: first touch matches the thread that will use each partition */
+double *buf = malloc(N * sizeof(double));
+#pragma omp parallel for schedule(static)
+for (int i = 0; i < N; i++) buf[i] = 0.0;  /* each thread touches its own pages */
+```
+
+### Inspecting NUMA Topology
+
+```bash
+# Show NUMA node layout
+numactl --hardware
+
+# Show which CPUs are on which NUMA node
+lscpu | grep -i numa
+
+# Run a process pinned to NUMA node 0, using only node 0's memory
+numactl --cpunodebind=0 --membind=0 ./myprogram
+```
+
+Example `numactl --hardware` output on a dual-socket node:
+
+```
+available: 2 nodes (0-1)
+node 0 cpus: 0 1 2 ... 31
+node 0 size: 128 GB
+node 1 cpus: 32 33 34 ... 63
+node 1 size: 128 GB
+node distances:
+node   0   1
+  0:  10  21
+  1:  21  10
+```
+
+The distance values (10 = local, 21 = remote) directly reflect the latency ratio.
+
+### POSIX NUMA-Aware Allocation
+
+POSIX provides `numa_alloc_onnode` (from `libnuma`) for explicit NUMA-local allocation,
+and `mbind` / `set_mempolicy` from `<numaif.h>` for policy-based placement:
+
+```c
+#include <numa.h>        /* libnuma: -lnuma */
+#include <numaif.h>
+
+/* Approach 1: allocate directly on a specific NUMA node */
+int target_node = 0;
+size_t bytes = N * sizeof(double);
+double *buf = (double *)numa_alloc_onnode(bytes, target_node);
+if (!buf) { perror("numa_alloc_onnode"); exit(1); }
+
+/* ... use buf ... */
+numa_free(buf, bytes);   /* must use numa_free, not free() */
+
+
+/* Approach 2: malloc then bind pages to a node set via mbind */
+double *buf2 = malloc(bytes);
+unsigned long nodemask = 1UL << target_node;  /* bit mask: node 0 only */
+
+/* MPOL_BIND: pages are allocated only from the specified node set */
+mbind(buf2, bytes,
+      MPOL_BIND,
+      &nodemask, /* maxnode */ sizeof(nodemask) * 8,
+      MPOL_MF_MOVE | MPOL_MF_STRICT);
+```
+
+**Memory policies** passed to `mbind`:
+
+| Policy | Behaviour |
+|---|---|
+| `MPOL_DEFAULT` | Thread's default policy (usually first-touch) |
+| `MPOL_BIND` | Allocate only from the specified node set; fail if full |
+| `MPOL_PREFERRED` | Prefer specified node, fall back to others if necessary |
+| `MPOL_INTERLEAVE` | Round-robin across nodes; good for shared read-mostly data |
+
+`MPOL_INTERLEAVE` is useful for data accessed equally by threads on all sockets — it
+distributes the bandwidth load rather than saturating one node's memory bus:
+
+```c
+/* Interleave pages across all NUMA nodes for a shared read-only table */
+unsigned long all_nodes = (1UL << numa_num_configured_nodes()) - 1;
+mbind(shared_table, table_bytes, MPOL_INTERLEAVE, &all_nodes,
+      sizeof(all_nodes) * 8, MPOL_MF_MOVE);
+```
+
+### Querying NUMA Node of a Running MPI Process
+
+From within an MPI program, determine which NUMA node each rank's memory should
+target by combining `sched_getcpu` (which CPU is running) with `numa_node_of_cpu`:
+
+```c
+#include <sched.h>   /* sched_getcpu */
+#include <numa.h>
+
+int cpu  = sched_getcpu();
+int node = numa_node_of_cpu(cpu);
+printf("Rank %d: CPU %d, NUMA node %d\n", rank, cpu, node);
+
+/* Allocate rank-local data on that rank's NUMA node */
+double *local_buf = (double *)numa_alloc_onnode(local_N * sizeof(double), node);
+```
 
 ### Binding Processes to Cores
 

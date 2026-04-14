@@ -96,24 +96,144 @@ if (half_comm != MPI_COMM_NULL) {
 
 ### 2D Decomposition Pattern
 
+Many parallel algorithms — 2D stencil computations, distributed matrix operations,
+parallel FFT — decompose work across a 2D logical process grid. Each process owns a
+rectangular tile of a 2D domain and communicates with its four neighbors (left, right,
+above, below). Two communicators are needed: one per row, one per column.
+
+#### MPI_Dims_create
+
 ```c
-/* Decompose P processes into a 2D grid: rows and columns */
+int MPI_Dims_create(int nnodes, int ndims, int dims[]);
+```
+
+Given a total process count `nnodes` and number of dimensions `ndims`, fills in the
+`dims` array with a balanced factorisation. Elements set to 0 are computed; non-zero
+elements are treated as fixed constraints.
+
+```c
 int dims[2] = {0, 0};
-MPI_Dims_create(size, 2, dims);  /* fills dims[]: e.g., {4,4} for 16 processes */
+MPI_Dims_create(16, 2, dims);  /* → {4, 4} */
+MPI_Dims_create(12, 2, dims);  /* → {4, 3} (or {3,4} — impl. dependent) */
+MPI_Dims_create(6,  2, dims);  /* → {3, 2} */
 
-int row = rank / dims[1];
-int col = rank % dims[1];
+/* Fix the number of rows, let MPI choose columns */
+int dims2[2] = {2, 0};
+MPI_Dims_create(16, 2, dims2); /* → {2, 8} */
+```
 
-/* Row communicator: all processes sharing the same row index */
+The factorisation is chosen to minimise the maximum dimension, producing the most
+"square" grid possible. This minimises the surface-to-volume ratio of each tile,
+which reduces halo exchange volume (see Chapter 6).
+
+#### Rank-to-Grid Mapping
+
+With `dims = {nrows, ncols}`, lay ranks out in **row-major** order — the same order
+as C 2D arrays:
+
+```
+16 processes, dims = {4, 4}:
+
+          col 0   col 1   col 2   col 3
+  row 0: [ r=0 ] [ r=1 ] [ r=2 ] [ r=3 ]
+  row 1: [ r=4 ] [ r=5 ] [ r=6 ] [ r=7 ]
+  row 2: [ r=8 ] [ r=9 ] [r=10 ] [r=11 ]
+  row 3: [r=12 ] [r=13 ] [r=14 ] [r=15 ]
+```
+
+Each rank derives its (row, col) coordinates with integer arithmetic:
+
+```c
+int row = rank / dims[1];   /* which row am I in? */
+int col = rank % dims[1];   /* which column am I in? */
+```
+
+For rank 9: `row = 9/4 = 2`, `col = 9%4 = 1` → grid position (2,1). ✓
+
+#### Splitting into Row and Column Communicators
+
+`MPI_Comm_split` maps `color` → "which new communicator do I join?" and `key` →
+"what rank do I get within that communicator?"
+
+```c
+MPI_Comm row_comm, col_comm;
+
+/* row_comm: color = row index → all processes in the same row join together.
+   key = col → within the row communicator, ranks are assigned left-to-right. */
+MPI_Comm_split(MPI_COMM_WORLD, row, col, &row_comm);
+
+/* col_comm: color = col index → all processes in the same column join together.
+   key = row → within the column communicator, ranks are assigned top-to-bottom. */
+MPI_Comm_split(MPI_COMM_WORLD, col, row, &col_comm);
+```
+
+Result for the 4×4 grid:
+
+```
+row_comm groups (each group = one row):
+  row_comm[0]: {rank 0, 1, 2,  3 }  → row_comm ranks 0,1,2,3
+  row_comm[1]: {rank 4, 5, 6,  7 }  → row_comm ranks 0,1,2,3
+  row_comm[2]: {rank 8, 9, 10, 11}  → row_comm ranks 0,1,2,3
+  row_comm[3]: {rank12,13, 14, 15}  → row_comm ranks 0,1,2,3
+
+col_comm groups (each group = one column):
+  col_comm[0]: {rank 0, 4,  8, 12}  → col_comm ranks 0,1,2,3
+  col_comm[1]: {rank 1, 5,  9, 13}  → col_comm ranks 0,1,2,3
+  col_comm[2]: {rank 2, 6, 10, 14}  → col_comm ranks 0,1,2,3
+  col_comm[3]: {rank 3, 7, 11, 15}  → col_comm ranks 0,1,2,3
+```
+
+Every rank belongs to exactly one `row_comm` and exactly one `col_comm`.
+
+#### Full Example — 2D Halo Neighbour Discovery and Reduction
+
+```c
+int dims[2] = {0, 0};
+MPI_Dims_create(size, 2, dims);
+
+int nrows = dims[0], ncols = dims[1];
+int row = rank / ncols;
+int col = rank % ncols;
+
 MPI_Comm row_comm, col_comm;
 MPI_Comm_split(MPI_COMM_WORLD, row, col, &row_comm);
 MPI_Comm_split(MPI_COMM_WORLD, col, row, &col_comm);
 
-/* Reduce along each row */
-MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_SUM, row_comm);
-/* Reduce along each column */
-MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_SUM, col_comm);
+/* Neighbours in the 2D grid (MPI_PROC_NULL for boundary ranks) */
+int left  = (col > 0)        ? rank - 1      : MPI_PROC_NULL;
+int right = (col < ncols-1)  ? rank + 1      : MPI_PROC_NULL;
+int up    = (row > 0)        ? rank - ncols  : MPI_PROC_NULL;
+int down  = (row < nrows-1)  ? rank + ncols  : MPI_PROC_NULL;
+
+/* Reduce across own row — each rank contributes local_row_val */
+double local_row_val = compute_row_contribution();
+MPI_Allreduce(MPI_IN_PLACE, &local_row_val, 1, MPI_DOUBLE, MPI_SUM, row_comm);
+
+/* Reduce across own column */
+double local_col_val = compute_col_contribution();
+MPI_Allreduce(MPI_IN_PLACE, &local_col_val, 1, MPI_DOUBLE, MPI_SUM, col_comm);
+
+MPI_Comm_free(&row_comm);
+MPI_Comm_free(&col_comm);
 ```
+
+`MPI_PROC_NULL` is a safe dummy rank: sends to it vanish, receives from it return
+immediately with zero bytes — no special-casing needed for boundary processes.
+
+#### When to Use This Pattern
+
+| Use case | What the split provides |
+|---|---|
+| 2D stencil (PDE, image processing) | Halo exchange with 4 neighbours; row/col reductions for boundary conditions |
+| Distributed matrix multiply (SUMMA, Cannon's algorithm) | Broadcast a matrix panel along `row_comm`; reduce result along `col_comm` |
+| Parallel FFT | 1D FFTs along rows using `row_comm`; transpose; 1D FFTs along columns using `col_comm` |
+| 2D domain I/O | Each row writes its slab collectively using `row_comm` |
+
+Note: Chapter 15 covers `MPI_Cart_create`, which offers the same 2D grid structure
+plus built-in shift/neighbour queries (`MPI_Cart_shift`, `MPI_Cart_coords`) without
+the manual rank arithmetic shown above. Use Cartesian communicators when topology
+information (dimension count, periodicity) needs to be embedded in the communicator
+itself.
 
 ---
 
