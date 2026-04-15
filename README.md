@@ -155,6 +155,7 @@ mpiexec -n 4 ./hello
 | [Ch 34: UCX and libfabric](ch34_ucx_libfabric.md) | UCX `UCX_TLS` transports; libfabric `FI_PROVIDER`; Slingshot (`cxi`), Omni-Path (`psm2`), InfiniBand; OSU benchmarks |
 | [Ch 35: Application-Level Checkpointing](ch35_checkpointing.md) | Multi-level hierarchy; SCR API (`SCR_Need_checkpoint`, `SCR_Route_file`); VeloC async flush; manual MPI-IO checkpointing |
 | [Ch 36: mpi4py — MPI for Python](ch36_mpi4py.md) | Pickle vs buffer-protocol methods; NumPy zero-copy; all collectives; non-blocking; RMA; C interop; `MPIPoolExecutor` |
+| [Ch 37: MPI with Intel TBB](ch37_intel_tbb.md) | Concurrent containers; flow graph; NUMA-aware task arenas; affinity partitioner; `enumerable_thread_specific`; `parallel_pipeline`; scalable allocator |
 
 ### Appendices (~10 pages)
 
@@ -185,6 +186,7 @@ mpiexec -n 4 ./hello
 | UCX / libfabric transport layers | UCX 1.14+ / libfabric 1.18+ | Ch 34 |
 | SCR / VeloC checkpointing | SCR 3.x / VeloC 1.x | Ch 35 |
 | mpi4py Python bindings | mpi4py 3.x | Ch 36 |
+| Intel oneTBB — concurrent containers, flow graph, task arenas | oneTBB 2021+ | Ch 37 |
 
 ---
 
