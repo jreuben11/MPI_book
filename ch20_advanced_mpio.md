@@ -221,6 +221,30 @@ Preallocating reserves contiguous space on the filesystem before any data is wri
 On Lustre, this prevents OST-level metadata operations during the write phase and
 ensures optimal stripe layout.
 
+### Pattern 5: io_uring for Application-Level I/O Alongside MPI-IO
+
+ROMIO (the MPI-IO implementation used by Open MPI, MPICH, and Cray MPICH) does not
+use **io_uring** internally as of 2025. It submits I/O through POSIX `pread`/`pwrite`
+calls, letting the OS handle buffering and scheduling.
+
+This matters when your application performs I/O *outside* MPI-IO — for example,
+reading restart files, writing diagnostic logs, or staging data through node-local
+NVMe before a collective write to Lustre. For those application-managed I/O paths,
+prefer io_uring (kernel 5.1+, `liburing`) over POSIX AIO (`aio_write`) or
+`O_NONBLOCK` polling:
+
+- **POSIX AIO** (`aio_write`, `aio_suspend`) has a poor implementation on Linux
+  (kernel threads, not native async); effectively synchronous under load.
+- **`O_NONBLOCK` polling** (`select`/`epoll`) works for network sockets but is not
+  meaningful for regular files — they are always "ready" even under heavy I/O pressure.
+- **io_uring** is the correct Linux async I/O primitive for files: true async,
+  batched submission, fixed-buffer registration, and zero extra copies with
+  `O_DIRECT`. See Chapter 35, Section 35.8 for a complete pattern.
+
+For all writes to parallel filesystems that MPI-IO already manages, collective
+`_all` calls remain the right interface — io_uring is relevant only to the
+application-managed local I/O paths that run alongside or between MPI-IO calls.
+
 ---
 
 ## 20.7 Checkpoint/Restart Pattern

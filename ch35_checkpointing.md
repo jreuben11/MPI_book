@@ -500,6 +500,156 @@ srun ./solver --ckpt-dir=$CKPT_DIR
 
 ---
 
+## 35.8 io_uring for Local Checkpoint Writes
+
+For Level 0 node-local checkpoints to NVMe (the fastest tier in the multi-level
+hierarchy), bypassing the kernel page cache with `O_DIRECT` plus Linux's
+**io_uring** interface (kernel 5.1+) delivers maximum throughput and avoids stalling
+compute threads on I/O system calls.
+
+io_uring works through two lock-free ring buffers in shared memory between kernel
+and user space:
+- **Submission Queue (SQ)**: application posts I/O requests without a syscall per I/O
+- **Completion Queue (CQ)**: kernel posts completions; application polls or waits
+
+This allows batching dozens of writes into a single `io_uring_submit()` syscall and
+overlapping I/O with computation — ideal for streaming checkpoint data to local NVMe
+while MPI continues the next iteration.
+
+### liburing Setup
+
+```bash
+sudo apt install liburing-dev    # Ubuntu 20.04+ / kernel 5.4+
+sudo dnf install liburing-devel  # Fedora/RHEL
+```
+
+### Fixed-Buffer O_DIRECT Pattern
+
+```c
+#include <liburing.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <mpi.h>
+
+#define QUEUE_DEPTH  64
+#define BLOCK_SIZE   (1UL << 20)   /* 1 MiB chunks */
+
+/* O_DIRECT requires 512-byte-aligned I/O and page-aligned buffers */
+static int open_direct(const char *path)
+{
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT, 0644);
+    if (fd < 0) { perror("open"); exit(1); }
+    return fd;
+}
+
+void uring_checkpoint(int fd, void *data, size_t nbytes)
+{
+    struct io_uring ring;
+    io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
+
+    /* Register buffer once — avoids per-write memory pinning overhead */
+    struct iovec iov = { .iov_base = data, .iov_len = nbytes };
+    io_uring_register_buffers(&ring, &iov, 1);
+
+    size_t offset = 0;
+    int in_flight  = 0;
+
+    while (offset < nbytes || in_flight > 0) {
+        /* Fill SQ with new writes */
+        while (offset < nbytes && in_flight < QUEUE_DEPTH) {
+            size_t chunk = (nbytes - offset < BLOCK_SIZE) ? nbytes - offset
+                                                          : BLOCK_SIZE;
+            struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+            /* WRITE_FIXED: uses pre-registered buffer — no re-pinning per call */
+            io_uring_prep_write_fixed(sqe, fd, (char *)data + offset,
+                                      chunk, (off_t)offset, 0 /* buf_index */);
+            sqe->user_data = (uint64_t)offset;
+            offset += chunk;
+            in_flight++;
+        }
+
+        io_uring_submit(&ring);   /* one syscall for all queued writes */
+
+        /* Wait for at least one completion before refilling */
+        struct io_uring_cqe *cqe;
+        io_uring_wait_cqe(&ring, &cqe);
+        if (cqe->res < 0)
+            fprintf(stderr, "write error at offset %zu: %s\n",
+                    (size_t)cqe->user_data, strerror(-cqe->res));
+        io_uring_cqe_seen(&ring, cqe);
+        in_flight--;
+    }
+
+    io_uring_unregister_buffers(&ring);
+    io_uring_queue_exit(&ring);
+}
+```
+
+### Integration with MPI Checkpointing
+
+```c
+int main(int argc, char *argv[])
+{
+    MPI_Init(&argc, &argv);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    const size_t N = 10000000;
+
+    /* posix_memalign: 4 KiB alignment satisfies O_DIRECT requirements */
+    double *x;
+    posix_memalign((void **)&x, 4096, N * sizeof(double));
+
+    for (int iter = 0; iter < MAX_ITER; iter++) {
+        compute(x, N);
+
+        if (iter % CKPT_FREQ == 0) {
+            /* Each rank writes independently to node-local NVMe */
+            char path[256];
+            snprintf(path, sizeof(path), "/local/nvme/ckpt_%05d_rank_%05d.bin",
+                     iter, rank);
+            int fd = open_direct(path);
+
+            uring_checkpoint(fd, x, N * sizeof(double));
+            fsync(fd);   /* flush write-back cache — required before marking done */
+            close(fd);
+
+            /* Collective fence: all ranks done before continuing */
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
+    }
+
+    free(x);
+    MPI_Finalize();
+}
+```
+
+```bash
+mpicc -O2 -o solver solver.c -luring
+```
+
+### When to Use io_uring vs MPI-IO
+
+| | `write()` / `fwrite()` | MPI-IO (`File_write_at_all`) | io_uring + O_DIRECT |
+|---|---|---|---|
+| Target storage | Any | Parallel FS (Lustre, GPFS) | Node-local NVMe, burst buffer |
+| Syscall cost | One per call | Library-managed | Batched — 1 `submit` per N writes |
+| Page cache | Yes | Yes (unless `O_DIRECT` hint) | Bypassed |
+| Collective optimization | No | Two-phase I/O, striping | N/A (local only) |
+| CPU stall | Blocks | Blocks | Overlap with compute |
+| Complexity | Low | Medium | Medium |
+
+**Guidance**: Use MPI-IO for all writes to parallel filesystems — ROMIO's collective
+buffering and Lustre striping optimizations already do the right thing there. Use
+io_uring for the **Level 0** tier only: direct writes to node-local NVMe or
+`/dev/shm` → burst buffer where you control the I/O path and want to pipeline
+checkpoint writes alongside ongoing computation. SCR and VeloC handle this tier
+internally; io_uring is relevant only when implementing your own Level 0 writer
+or augmenting the manual MPI-IO pattern from Section 35.5.
+
+---
+
 ## Summary
 
 | Topic | Key Points |
@@ -511,6 +661,7 @@ srun ./solver --ckpt-dir=$CKPT_DIR
 | Restart | `SCR_Have_restart` / `VELOC_Restart_test` → read saved state → resume iteration |
 | SLURM | Job arrays (`--array=1-N%1`) with time limits provide automatic restart mechanism |
 | I/O tips | Checkpoint to `/dev/shm` or burst buffer first; SCR/VeloC flush to PFS in background |
+| io_uring (Level 0) | `io_uring_queue_init` + `io_uring_register_buffers` + `O_DIRECT`; batch writes to local NVMe; overlap with compute; use only for app-managed local I/O, not parallel FS |
 
 ---
 

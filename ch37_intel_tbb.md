@@ -3,8 +3,15 @@
 ## 37.1 Why TBB with MPI?
 
 Intel Threading Building Blocks (oneTBB, open-source since 2017) is the most
-widely used C++ task-parallelism library in HPC outside of OpenMP. It provides
-several capabilities that C++26 does not standardise:
+widely used C++ task-parallelism library in HPC outside of OpenMP. Despite the
+"Intel" brand name, oneTBB is fully portable — it uses standard POSIX threads
+internally and runs on x86-64 (Intel and AMD), AArch64 (Apple Silicon, AWS
+Graviton, NVIDIA Grace), PowerPC/POWER, and RISC-V. The only Intel-specific
+feature is `tbb::info::core_types()` for P-core/E-core distinction on Intel
+12th Gen+ hybrid CPUs; on all other architectures it returns a single core type
+and the rest of the API is identical.
+
+oneTBB provides several capabilities that C++26 does not standardise:
 
 - **Concurrent containers** — thread-safe hash maps, vectors, and queues with
   no external locking required
@@ -253,10 +260,11 @@ if (numa_nodes.size() > 1) {
 }
 ```
 
-### Hybrid CPU Scheduling (P-core / E-core)
+### Hybrid CPU Scheduling (P-core / E-core — Intel 12th Gen+ only)
 
 On Intel 12th Gen+ (Alder Lake and later) with P-cores and E-cores, TBB exposes
-`core_type_id` to steer work:
+`core_type_id` to steer work. On AMD, ARM, and other platforms `core_types()`
+returns a single entry and this subsection does not apply:
 
 ```cpp
 /* Get the core type IDs */

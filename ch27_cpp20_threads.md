@@ -827,13 +827,328 @@ if (result) {
 |---|---|
 | **stdexec** (NVIDIA/Sandia) | Reference implementation; became the basis for the C++26 draft |
 | **libunifex** (Meta) | Production use at Meta; predates P2300, partially compatible |
-| **Asio** (Boost/standalone) | `asio::execution` supports the Senders model; widely deployed |
+| **Asio** (Boost/standalone) | `asio::execution` supports the Senders model; widely deployed; Boost.Asio 1.78+ / standalone Asio 1.24+ select io_uring as the I/O backend at compile time (`ASIO_HAS_IO_URING`), making it the practical scheduler for pipelines that combine MPI communication with local file I/O |
 
 MPI implementations have not yet adopted Senders natively. Wrapping blocking MPI
 calls in scheduler-dispatched senders (as shown above) is the practical approach
 until MPI-native async senders exist. The cancellation model aligns naturally with
 `std::stop_token`, making Senders and the Section 27.4 `jthread` patterns compose
 without impedance mismatch.
+
+---
+
+## 27.13 stdexec — The P2300 Reference Implementation
+
+[**stdexec**](https://github.com/NVIDIA/stdexec) (NVIDIA + Sandia National
+Laboratories) is the reference implementation of P2300 that became the basis for
+the C++26 `std::execution` draft. It is header-only, available on GitHub, and
+ships with two important extensions not in the C++26 standard:
+
+- **`exec::static_thread_pool`** — a work-stealing thread pool with a Senders-native
+  scheduler; the standard does not mandate a concrete thread pool type
+- **`nvexec::stream_scheduler`** — schedules sender chains onto a CUDA stream;
+  allows GPU kernels and MPI operations to be composed in the same pipeline
+
+### Installation
+
+```bash
+# CMake FetchContent (header-only — no build step)
+include(FetchContent)
+FetchContent_Declare(
+    stdexec
+    GIT_REPOSITORY https://github.com/NVIDIA/stdexec.git
+    GIT_TAG        main
+)
+FetchContent_MakeAvailable(stdexec)
+
+target_link_libraries(myapp PRIVATE stdexec)
+```
+
+```bash
+# vcpkg
+vcpkg install stdexec
+```
+
+Compile with C++23 (`-std=c++23`) for full feature coverage; C++20 with
+`-DSTDEXEC_NO_SENDER_CONCEPTS` works for most examples.
+
+### Core Scheduler Types
+
+```cpp
+#include <stdexec/execution.hpp>
+#include <exec/static_thread_pool.hpp>
+
+namespace ex = stdexec;
+
+exec::static_thread_pool pool(4);
+auto sched = pool.get_scheduler();
+
+/* schedule(sched) produces a sender that, when started, posts work to the pool */
+auto sender = ex::schedule(sched)
+            | ex::then([] { return compute_local(); });
+
+auto [result] = ex::sync_wait(std::move(sender)).value();
+```
+
+### Blocking MPI Calls on a Thread-Pool Scheduler
+
+The fundamental pattern: offload blocking MPI calls to a pool thread so the
+calling thread is free to drive the pipeline.
+
+```cpp
+#include <stdexec/execution.hpp>
+#include <exec/static_thread_pool.hpp>
+#include <mpi.h>
+
+namespace ex = stdexec;
+
+/* Wrap blocking MPI_Recv as a sender — runs on a pool thread */
+auto mpi_recv_sender(exec::static_thread_pool::scheduler sched,
+                     double *buf, int count,
+                     int src, int tag, MPI_Comm comm)
+{
+    return ex::schedule(sched)
+         | ex::then([=]() mutable {
+               MPI_Recv(buf, count, MPI_DOUBLE, src, tag,
+                        comm, MPI_STATUS_IGNORE);
+           });
+}
+
+int main(int argc, char *argv[])
+{
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+
+    exec::static_thread_pool pool(4);
+    auto sched = pool.get_scheduler();
+
+    double buf_left[N], buf_right[N];
+
+    /* Receive from left and right neighbours concurrently */
+    auto pipeline =
+        ex::when_all(
+            mpi_recv_sender(sched, buf_left,  N, rank-1, TAG_LEFT,  MPI_COMM_WORLD),
+            mpi_recv_sender(sched, buf_right, N, rank+1, TAG_RIGHT, MPI_COMM_WORLD)
+        )
+      | ex::then([&]() {
+            /* Both receives complete before this lambda runs */
+            update_halos(buf_left, buf_right);
+        });
+
+    ex::sync_wait(std::move(pipeline));
+
+    MPI_Finalize();
+}
+```
+
+### nvexec: GPU Work in the Same Pipeline
+
+The `nvexec::stream_scheduler` schedules work on a CUDA stream. This allows GPU
+kernels and MPI receives to be expressed as a single composable pipeline:
+
+```cpp
+#include <stdexec/execution.hpp>
+#include <nvexec/stream_context.hpp>
+#include <exec/static_thread_pool.hpp>
+#include <mpi.h>
+
+namespace ex = stdexec;
+
+int main(int argc, char *argv[])
+{
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+
+    /* CPU thread pool for blocking MPI calls */
+    exec::static_thread_pool cpu_pool(2);
+    auto cpu_sched = cpu_pool.get_scheduler();
+
+    /* GPU stream context — one CUDA stream per context */
+    nvexec::stream_context gpu_ctx;
+    auto gpu_sched = gpu_ctx.get_scheduler();
+
+    double *d_buf;  /* CUDA device pointer */
+    cudaMalloc(&d_buf, N * sizeof(double));
+
+    /* Pipeline:
+       1. CPU thread: MPI_Recv into a staging buffer
+       2. Transfer to GPU (on the stream scheduler)
+       3. GPU kernel: process data
+       4. CPU thread: MPI_Send result */
+    double h_buf[N];
+
+    auto pipeline =
+        /* Step 1: blocking recv on pool thread */
+        ex::schedule(cpu_sched)
+      | ex::then([&]() {
+            MPI_Recv(h_buf, N, MPI_DOUBLE, src, 0,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        })
+        /* Step 2–3: transfer to GPU and run kernel */
+      | ex::continues_on(gpu_sched)
+      | ex::then([&]() {
+            cudaMemcpy(d_buf, h_buf, N * sizeof(double),
+                       cudaMemcpyHostToDevice);
+            launch_stencil_kernel(d_buf, N);  /* launches on the stream */
+        })
+        /* Step 4: send result back from CPU thread */
+      | ex::continues_on(cpu_sched)
+      | ex::then([&]() {
+            cudaMemcpy(h_buf, d_buf, N * sizeof(double),
+                       cudaMemcpyDeviceToHost);
+            MPI_Send(h_buf, N, MPI_DOUBLE, dest, 0, MPI_COMM_WORLD);
+        });
+
+    ex::sync_wait(std::move(pipeline));
+
+    cudaFree(d_buf);
+    MPI_Finalize();
+}
+```
+
+```bash
+nvcc -std=c++23 -O2 -o solver solver.cu \
+    -I/path/to/stdexec/include \
+    $(mpicc --showme:compile) $(mpicc --showme:link)
+```
+
+`ex::continues_on(sched)` (the P2300 spelling; `ex::transfer` in older snapshots)
+transfers the pipeline's execution context from the current scheduler to the
+target one. The CUDA stream advances automatically as each GPU-side `then` lambda
+returns — no explicit `cudaStreamSynchronize` is needed between GPU steps within
+the same pipeline.
+
+For CUDA context setup and CUDA-aware MPI details, see Chapter 30.
+
+### Namespace Quick Reference
+
+| Symbol | Header | Purpose |
+|---|---|---|
+| `stdexec::then` | `<stdexec/execution.hpp>` | Chain work after a sender |
+| `stdexec::when_all` | `<stdexec/execution.hpp>` | Fan-in: wait for all senders |
+| `stdexec::sync_wait` | `<stdexec/execution.hpp>` | Block until sender completes |
+| `stdexec::continues_on` | `<stdexec/execution.hpp>` | Transfer to a different scheduler |
+| `exec::static_thread_pool` | `<exec/static_thread_pool.hpp>` | Work-stealing CPU pool |
+| `nvexec::stream_context` | `<nvexec/stream_context.hpp>` | CUDA stream scheduler |
+| `nvexec::stream_scheduler` | (from `stream_context`) | `get_scheduler()` result |
+
+---
+
+## 27.14 std::simd — Portable SIMD in C++26
+
+`std::simd` (P1928, merged into C++26) is a portable abstraction over CPU SIMD
+registers. It replaces hand-written AVX/SSE intrinsics or compiler-specific
+`__attribute__((vector_size(...)))` extensions with standard C++ that the
+compiler lowers to native vector instructions.
+
+The section 27.9 `par_unseq` policy internally exploits SIMD — but through the
+compiler's auto-vectoriser, not the programmer's explicit control. `std::simd`
+gives explicit control when auto-vectorisation fails or when fine-grained mask
+operations are needed.
+
+### Core Types
+
+```cpp
+#include <simd>   /* C++26; <experimental/simd> in C++23 implementations */
+namespace stdx = std::experimental;   /* GCC 11+, Clang 17+ ship the experimental version */
+
+/* simd<T, Abi> — a vector of T elements, width determined by Abi tag */
+using floatv  = stdx::simd<float,  stdx::simd_abi::native<float>>;   /* e.g. 8 on AVX2 */
+using doublev = stdx::simd<double, stdx::simd_abi::native<double>>;  /* e.g. 4 on AVX2 */
+
+/* fixed_size<N>: explicit width, portable across targets */
+using float8 = stdx::simd<float, stdx::simd_abi::fixed_size<8>>;
+
+std::cout << floatv::size() << "\n";   /* 8 on AVX2, 16 on AVX-512 */
+```
+
+### Stencil Kernel with std::simd
+
+A 1D Laplacian stencil — the innermost kernel between MPI halo exchanges:
+
+```cpp
+#include <simd>
+#include <span>
+namespace stdx = std::experimental;
+
+using dv = stdx::simd<double, stdx::simd_abi::native<double>>;
+constexpr int W = dv::size();   /* SIMD width: 4 (AVX2) or 8 (AVX-512) */
+
+/* Apply u_new[i] = 0.5*(u[i-1] + u[i+1]) over the interior
+   buf[-1] and buf[N] are ghost cells already exchanged via MPI */
+void laplacian_simd(const double *__restrict__ u,
+                    double       *__restrict__ u_new,
+                    int N)
+{
+    int i = 1;
+    for (; i + W <= N - 1; i += W) {
+        dv left (&u[i - 1], stdx::element_aligned);
+        dv centre(&u[i    ], stdx::element_aligned);
+        dv right (&u[i + 1], stdx::element_aligned);
+
+        dv result = 0.5 * (left + right);
+        result.copy_to(&u_new[i], stdx::element_aligned);
+    }
+    /* Scalar tail for remaining elements */
+    for (; i < N - 1; i++)
+        u_new[i] = 0.5 * (u[i-1] + u[i+1]);
+}
+```
+
+### Masked Operations
+
+`simd_mask` enables per-lane conditional writes without branching:
+
+```cpp
+dv vals(&data[i], stdx::element_aligned);
+auto mask = (vals > 0.0);          /* simd_mask<double>: true where positive */
+dv clamped = stdx::where(mask, vals, dv(0.0));   /* zero out negatives */
+clamped.copy_to(&data[i], stdx::element_aligned);
+```
+
+### MPI Compatibility
+
+`std::simd` storage is **contiguous** and trivially copyable. A `simd<double, fixed_size<N>>` is
+binary-identical to `double[N]` in memory and can be sent directly via MPI:
+
+```cpp
+float8 local_vec(&local_data[0], stdx::element_aligned);
+
+/* Send 8 floats — binary layout is identical to float[8] */
+MPI_Send(&local_vec, float8::size(), MPI_FLOAT, dest, 0, MPI_COMM_WORLD);
+
+float8 recv_vec;
+MPI_Recv(&recv_vec, float8::size(), MPI_FLOAT, src, 0,
+         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+```
+
+Use `fixed_size<N>` rather than `native<T>` for inter-rank sends if processes may
+run on hardware with different SIMD widths (heterogeneous clusters). `native<T>` is
+safe only when all ranks have the same vector ISA.
+
+### Build Flags
+
+```bash
+# GCC / Clang: enable AVX2 (256-bit) or AVX-512 (512-bit)
+mpic++ -std=c++23 -O3 -march=native -o solver solver.cpp
+
+# Check which vector ISA the compiler selected:
+mpic++ -std=c++23 -O3 -march=native -fopt-info-vec solver.cpp
+```
+
+The `<experimental/simd>` header is available in GCC 11+ and Clang 17+ (as
+`<experimental/simd>`). The `<simd>` header without `experimental` requires
+GCC 15+ or a C++26-mode Clang. For production code today, use the experimental
+header with a compatibility alias:
+
+```cpp
+#if __cpp_lib_experimental_parallel_simd >= 201803L
+#  include <experimental/simd>
+   namespace stdx = std::experimental;
+#else
+#  error "std::simd not available"
+#endif
+```
 
 ---
 
@@ -851,6 +1166,9 @@ without impedance mismatch.
 | C++20 coroutines (`co_await`) | Awaitable MPI ops; requires a user-built event loop |
 | Boost.Fiber | Stackful green threads; use non-blocking MPI + `yield` to avoid blocking the OS thread |
 | C++26 `std::execution` (Senders) | Composable async pipelines; wrap MPI ops as senders; cancellation via `stop_token` |
+| stdexec (`exec::static_thread_pool`) | Reference P2300 impl; offload blocking MPI to pool thread; `when_all` for concurrent receives |
+| stdexec (`nvexec::stream_scheduler`) | Compose GPU kernels + MPI in one pipeline; `continues_on` to switch CPU↔GPU contexts |
+| `std::simd` / `fixed_size<N>` | Vectorised stencil kernels; binary-compatible with MPI datatypes; use `fixed_size` for cross-ISA portability |
 
 **Thread level guide**:
 - Prefer `MPI_THREAD_FUNNELED` + `std::jthread` workers for compute/communicate overlap

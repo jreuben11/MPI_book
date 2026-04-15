@@ -145,7 +145,7 @@ mpiexec -n 4 ./hello
 
 | Chapter | Topics |
 |---|---|
-| [Ch 27: MPI with C++20 Threads](ch27_cpp20_threads.md) | `std::jthread` RAII; `std::stop_token` progress threads; `std::packaged_task`+`future` async MPI; `std::barrier` coordination |
+| [Ch 27: MPI with C++20 Threads](ch27_cpp20_threads.md) | `std::jthread` RAII; `std::stop_token` progress threads; `std::packaged_task`+`future` async MPI; `std::barrier` coordination; `std::simd` vectorised kernels; C++26 Senders/Receivers; stdexec + nvexec |
 | [Ch 28: MPI with SLURM](ch28_slurm.md) | `srun` vs `mpiexec`; batch script anatomy; SLURM env vars; process binding; PMIx bootstrapping; job arrays; Lustre I/O |
 | [Ch 29: OpenSHMEM](ch29_openshmem.md) | PE model, symmetric heap; `shmem_put`/`get`; synchronization; atomics; OpenSHMEM 1.5 teams; MPI interop |
 | [Ch 30: MPI with CUDA and NCCL](ch30_cuda_nccl.md) | GPU-aware MPI; device pointer sends; CUDA streams + non-blocking overlap; NCCL init and collectives; MPI vs NCCL |
@@ -156,6 +156,7 @@ mpiexec -n 4 ./hello
 | [Ch 35: Application-Level Checkpointing](ch35_checkpointing.md) | Multi-level hierarchy; SCR API (`SCR_Need_checkpoint`, `SCR_Route_file`); VeloC async flush; manual MPI-IO checkpointing |
 | [Ch 36: mpi4py — MPI for Python](ch36_mpi4py.md) | Pickle vs buffer-protocol methods; NumPy zero-copy; all collectives; non-blocking; RMA; C interop; `MPIPoolExecutor` |
 | [Ch 37: MPI with Intel TBB](ch37_intel_tbb.md) | Concurrent containers; flow graph; NUMA-aware task arenas; affinity partitioner; `enumerable_thread_specific`; `parallel_pipeline`; scalable allocator |
+| [Ch 38: MPI with SYCL](ch38_sycl.md) | SYCL 2020 programming model; USM memory kinds; standard vs SYCL-aware MPI; Intel oneAPI DPC++ / AdaptiveCpp; overlap pattern; multi-GPU; oneCCL |
 
 ### Appendices (~10 pages)
 
@@ -187,6 +188,9 @@ mpiexec -n 4 ./hello
 | SCR / VeloC checkpointing | SCR 3.x / VeloC 1.x | Ch 35 |
 | mpi4py Python bindings | mpi4py 3.x | Ch 36 |
 | Intel oneTBB — concurrent containers, flow graph, task arenas | oneTBB 2021+ | Ch 37 |
+| SYCL 2020 — portable GPU programming; USM + MPI | SYCL 2020 / oneAPI | Ch 38 |
+| C++26 `std::simd` — vectorised stencil kernels | C++26 / P1928 | Ch 27 |
+| stdexec — P2300 reference impl; nvexec CUDA scheduler | stdexec (NVIDIA) | Ch 27 |
 
 ---
 
